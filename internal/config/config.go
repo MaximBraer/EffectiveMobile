@@ -10,7 +10,7 @@ import (
 type Config struct {
 	Env        string `yaml:"env" env-default:"development"`
 	HTTPServer `yaml:"http_server"`
-	Postgres   `yaml:"storage"`
+	Storage    `yaml:"storage"`
 }
 
 type HTTPServer struct {
@@ -19,11 +19,18 @@ type HTTPServer struct {
 	IdleTimeout time.Duration `yaml:"idle_timeout" env-default:"5s"`
 }
 
-type Postgres struct {
-	Address  string `yaml:"address" env-default:"localhost:5432"`
-	User     string `yaml:"user"`
-	Password string `yaml:"password"`
-	Database string `yaml:"database" env-default:"default"`
+type Storage struct {
+	Address                         string        `yaml:"address" env-default:"localhost:5432"`
+	User                            string        `yaml:"user"`
+	Password                        string        `yaml:"password"`
+	Database                        string        `yaml:"database" env-default:"default"`
+	MinConns                        int           `yaml:"minConns" env-default:"1"`
+	MaxConns                        int           `yaml:"maxConns" env-default:"1"`
+	MaxConnLifetime                 time.Duration `yaml:"maxConnLifetime" env-default:"3600s"`
+	HealthCheckPeriod               time.Duration `yaml:"healthCheckPeriod" env-default:"30s"`
+	MaxConnIdleTime                 time.Duration `yaml:"maxConnIdleTime" env-default:"60s"`
+	StatementTimeout                string        `yaml:"statementTimeout" env-default:"5000"`
+	IdleInTransactionSessionTimeout string        `yaml:"idleInTransactionSessionTimeout" env-default:"5000"`
 }
 
 func MustLoad() *Config {

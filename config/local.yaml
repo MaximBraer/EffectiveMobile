@@ -8,3 +8,10 @@ storage:
   user: ""
   password: ""
   database: ""
+  minConns: 2
+  maxConns: 10
+  maxConnLifetime: 3600s
+  HealthCheckPeriod: 30s
+  MaxConnIdleTime: 60s
+  StatementTimeout: 5000
+  IdleInTransactionSessionTimeout: 5000
