@@ -1,10 +1,11 @@
-﻿package postgres
+package postgres
 
 import (
 	"EffectiveMobile/internal/config"
 	"context"
 	"fmt"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"log/slog"
 	"net/url"
 	"time"
 )
@@ -13,10 +14,10 @@ type Storage struct {
 	db *pgxpool.Pool
 }
 
-func New(ctx context.Context, scfg config.Storage) (*Storage, error) {
+func New(ctx context.Context, scfg config.Storage, log *slog.Logger) (*Storage, error) {
 	const op = "storage.postgres.New"
+	log = log.With(slog.String("op", op))
 
-	// postgres://user:pass@host:port/db?sslmode=disable
 	user := url.QueryEscape(scfg.User)
 	pass := url.QueryEscape(scfg.Password)
 	host := scfg.Address
@@ -64,6 +65,7 @@ func New(ctx context.Context, scfg config.Storage) (*Storage, error) {
 		return nil, fmt.Errorf("%s: ping: %w", op, err)
 	}
 
+	log.Info("storage is connected")
 	return &Storage{db: pool}, nil
 }
 
