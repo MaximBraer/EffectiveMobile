@@ -1,10 +1,10 @@
 env: "local"
 http_server:
-  address: "localhost:8082"
+  address: "0.0.0.0:8082"
   timeout: 4s
   idle_timeout: 60s
 storage:
-  address: "localhost:5433"
+  address: "postgres:5432"
   user: "postgres"
   password: "postgres"
   database: "subscriptions"
