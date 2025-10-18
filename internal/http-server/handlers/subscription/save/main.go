@@ -17,6 +17,11 @@ import (
 	"time"
 )
 
+type SubscriptionStorage interface {
+	GetOrCreateServiceID(ctx context.Context, name string) (int, error)
+	CreateSubscription(ctx context.Context, p postgres.CreateSubscriptionParams, log *slog.Logger) (int64, error)
+}
+
 type Response struct {
 	resp.Response
 	ID int64 `json:"id"`
@@ -30,7 +35,7 @@ type Request struct {
 	EndDate     *string   `json:"end_date,omitempty" validate:"omitempty,datetime=01-2006"`
 }
 
-func New(log *slog.Logger, s *postgres.Storage) http.HandlerFunc {
+func New(log *slog.Logger, s SubscriptionStorage) http.HandlerFunc {
 	const op = "handlers.subscription.save.New"
 	log = log.With(slog.String("op", op))
 

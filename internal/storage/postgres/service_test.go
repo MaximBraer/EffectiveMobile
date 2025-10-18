@@ -105,7 +105,6 @@ func findMigrationsDirMust() string {
 	}
 }
 
-// applyUps выполняет ВСЕ *.up.sql по порядку
 func applyUps(db *sql.DB, dir string) error {
 	var files []string
 	err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
