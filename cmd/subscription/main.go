@@ -16,7 +16,6 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
-	"time"
 )
 
 const (
@@ -42,8 +41,6 @@ func main() {
 	router.Use(logger.New(log))
 	router.Use(middleware.Recoverer)
 	router.Use(middleware.URLFormat)
-
-	router.Use(middleware.RequestID, middleware.Logger, middleware.Recoverer, middleware.Timeout(5*time.Second))
 
 	router.Route("/api/v1", func(r chi.Router) {
 		r.Route("/subscriptions", func(r chi.Router) {
