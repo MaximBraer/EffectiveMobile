@@ -33,11 +33,19 @@ POST /api/v1/subscriptions
 Content-Type: application/json
 
 {
-  "service_name": "Yandex Plus",
-  "price": 400,
-  "user_id": "60601fee-2bf1-4721-ae6f-7636e79a0cba",
-  "start_date": "07-2025",
-  "end_date": "12-2025"  // опционально
+  "service_name": "{service_name}",
+  "price": {price},
+  "user_id": "{user_id}",
+  "start_date": "{start_date}",
+  "end_date": "{end_date}" // опционально
+}
+```
+
+**Ответ:**
+```json
+{
+  "status": "ok",
+  "id": {id}
 }
 ```
 
@@ -46,14 +54,33 @@ Content-Type: application/json
 GET /api/v1/subscriptions/{id}
 ```
 
+**Ответ:**
+```json
+{
+  "id": {id},
+  "service_name": "{service_name}",
+  "price": {price},
+  "user_id": "{user_id}",
+  "start_date": "{start_date}",
+  "end_date": "{end_date}"
+}
+```
+
 #### Обновление подписки
 ```http
 PUT /api/v1/subscriptions/{id}
 Content-Type: application/json
 
 {
-  "price": 500,
-  "end_date": "12-2025"
+  "price": {price},
+  "end_date": "{end_date}"
+}
+```
+
+**Ответ:**
+```json
+{
+  "status": "ok"
 }
 ```
 
@@ -62,16 +89,52 @@ Content-Type: application/json
 DELETE /api/v1/subscriptions/{id}
 ```
 
+**Ответ:**
+```json
+{
+  "status": "ok"
+}
+```
+
 #### Список подписок
 ```http
-GET /api/v1/subscriptions?limit=10&offset=0&user_id=60601fee-2bf1-4721-ae6f-7636e79a0cba&service_name=Yandex
+GET /api/v1/subscriptions?limit={limit}&offset={offset}&user_id={user_id}&service_name={service_name}
+```
+
+**Ответ:**
+```json
+{
+  "subscriptions": [
+    {
+      "id": {id},
+      "service_name": "{service_name}",
+      "price": {price},
+      "user_id": "{user_id}",
+      "start_date": "{start_date}",
+      "end_date": "{end_date}"
+    }
+  ],
+  "total": {total}
+}
 ```
 
 ### Статистика
 
 #### Получение суммарной стоимости подписок
 ```http
-GET /api/v1/stats/total?user_id=60601fee-2bf1-4721-ae6f-7636e79a0cba&start_date=01-2025&end_date=12-2025&service_name=Yandex
+GET /api/v1/stats/total?user_id={user_id}&start_date={start_date}&end_date={end_date}&service_name={service_name}
+```
+
+**Ответ:**
+```json
+{
+  "total_cost": {total_cost},
+  "subscriptions_count": {subscriptions_count},
+  "period": {
+    "start_date": "{start_date}",
+    "end_date": "{end_date}"
+  }
+}
 ```
 
 **Параметры запроса:**
