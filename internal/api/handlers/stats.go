@@ -1,4 +1,4 @@
-package total
+package handlers
 
 import (
 	"EffectiveMobile/internal/lib/api/response"
@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
 	"github.com/google/uuid"
 )
@@ -30,8 +31,8 @@ type Filters struct {
 	ServiceName *string `json:"service_name,omitempty"`
 }
 
-func New(log *slog.Logger, s *postgres.Storage) http.HandlerFunc {
-	const op = "handlers.stats.total.New"
+func GetTotalStats(log *slog.Logger, s *postgres.Storage) http.HandlerFunc {
+	const op = "handlers.api.stats.GetTotalStats"
 	log = log.With(slog.String("op", op))
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -127,4 +128,10 @@ func formatUUID(uuid *uuid.UUID) *string {
 	}
 	str := uuid.String()
 	return &str
+}
+
+func GetStatRoutes(log *slog.Logger, s *postgres.Storage) chi.Router {
+	r := chi.NewRouter()
+	r.Get("/total", GetTotalStats(log, s))
+	return r
 }

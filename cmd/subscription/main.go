@@ -1,22 +1,14 @@
 ﻿package main
 
 import (
+	"EffectiveMobile/internal/api"
+	"EffectiveMobile/internal/api/middleware/logger"
 	"EffectiveMobile/internal/config"
-	stats_total "EffectiveMobile/internal/http-server/handlers/stats/total"
-	subscription_delete "EffectiveMobile/internal/http-server/handlers/subscription/delete"
-	subscription_get "EffectiveMobile/internal/http-server/handlers/subscription/get"
-	subscription_list "EffectiveMobile/internal/http-server/handlers/subscription/list"
-	subscription_save "EffectiveMobile/internal/http-server/handlers/subscription/save"
-	subscription_update "EffectiveMobile/internal/http-server/handlers/subscription/update"
-	"EffectiveMobile/internal/http-server/middleware/logger"
 	"EffectiveMobile/internal/storage/postgres"
 	"context"
 	"log/slog"
 	"net/http"
 	"os"
-
-	"github.com/go-chi/chi"
-	"github.com/go-chi/chi/middleware"
 )
 
 const (
@@ -36,23 +28,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	router := chi.NewRouter()
-
-	router.Use(middleware.RequestID)
-	router.Use(logger.New(log))
-	router.Use(middleware.Recoverer)
-	router.Use(middleware.URLFormat)
-
-	router.Route("/api/v1", func(r chi.Router) {
-		r.Route("/subscriptions", func(r chi.Router) {
-			r.Post("/", subscription_save.New(log, storage))
-			r.Get("/{id}", subscription_get.New(log, storage))
-			r.Put("/{id}", subscription_update.New(log, storage))
-			r.Delete("/{id}", subscription_delete.New(log, storage))
-			r.Get("/", subscription_list.New(log, storage))
-		})
-		r.Get("/stats/total", stats_total.New(log, storage))
-	})
+	router := api.NewRouter(log, storage)
 
 	log.Info("starting server", slog.String("env", cfg.HTTPServer.Address))
 

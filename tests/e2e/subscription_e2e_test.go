@@ -12,8 +12,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"EffectiveMobile/internal/api/handlers/subscription/save"
 	"EffectiveMobile/internal/config"
-	"EffectiveMobile/internal/http-server/handlers/subscription/save"
 	"EffectiveMobile/internal/lib/logger/handlers/slogdiscard"
 	"EffectiveMobile/internal/storage/postgres"
 )
