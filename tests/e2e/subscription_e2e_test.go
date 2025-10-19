@@ -25,7 +25,11 @@ func TestSubscriptionE2E_FullFlow(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	cfg := config.MustLoad()
+	cfg, err := config.MustLoad()
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	storage, err := postgres.New(ctx, cfg.Storage, slogdiscard.NewDiscardLogger())
 	require.NoError(t, err)
 	defer storage.Close()
