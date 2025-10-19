@@ -11,11 +11,12 @@ import (
 	"EffectiveMobile/internal/http-server/middleware/logger"
 	"EffectiveMobile/internal/storage/postgres"
 	"context"
-	"github.com/go-chi/chi"
-	"github.com/go-chi/chi/middleware"
 	"log/slog"
 	"net/http"
 	"os"
+
+	"github.com/go-chi/chi"
+	"github.com/go-chi/chi/middleware"
 )
 
 const (

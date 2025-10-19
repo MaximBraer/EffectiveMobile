@@ -7,13 +7,14 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/go-chi/chi/middleware"
-	"github.com/go-chi/render"
-	"github.com/go-playground/validator/v10"
 	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
+
+	"github.com/go-chi/chi/middleware"
+	"github.com/go-chi/render"
+	"github.com/go-playground/validator/v10"
 )
 
 type Request struct {
@@ -130,4 +131,3 @@ func parseMonth(s string) (time.Time, error) {
 	}
 	return time.Date(t.Year(), t.Month(), 1, 0, 0, 0, 0, time.UTC), nil
 }
-

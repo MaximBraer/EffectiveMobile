@@ -5,12 +5,13 @@ import (
 	"EffectiveMobile/internal/storage/postgres"
 	"context"
 	"encoding/json"
-	"github.com/go-chi/chi/middleware"
-	"github.com/google/uuid"
 	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
+
+	"github.com/go-chi/chi/middleware"
+	"github.com/google/uuid"
 )
 
 type Response struct {
@@ -19,19 +20,19 @@ type Response struct {
 }
 
 type Subscription struct {
-	ID          int64  `json:"id"`
-	ServiceName string `json:"service_name"`
-	Price       int    `json:"price"`
-	UserID      string `json:"user_id"`
-	StartDate   string `json:"start_date"`
+	ID          int64   `json:"id"`
+	ServiceName string  `json:"service_name"`
+	Price       int     `json:"price"`
+	UserID      string  `json:"user_id"`
+	StartDate   string  `json:"start_date"`
 	EndDate     *string `json:"end_date,omitempty"`
 }
 
 type Pagination struct {
-	Total    int  `json:"total"`
-	Limit    int  `json:"limit"`
-	Offset   int  `json:"offset"`
-	HasMore  bool `json:"has_more"`
+	Total   int  `json:"total"`
+	Limit   int  `json:"limit"`
+	Offset  int  `json:"offset"`
+	HasMore bool `json:"has_more"`
 }
 
 func New(log *slog.Logger, s *postgres.Storage) http.HandlerFunc {
@@ -92,10 +93,10 @@ func New(log *slog.Logger, s *postgres.Storage) http.HandlerFunc {
 		response := Response{
 			Subscriptions: make([]Subscription, len(subscriptions)),
 			Pagination: Pagination{
-				Total:    total,
-				Limit:    limit,
-				Offset:   offset,
-				HasMore:  offset+limit < total,
+				Total:   total,
+				Limit:   limit,
+				Offset:  offset,
+				HasMore: offset+limit < total,
 			},
 		}
 
@@ -123,4 +124,3 @@ func formatEndDate(endDate *time.Time) *string {
 	formatted := endDate.Format("01-2006")
 	return &formatted
 }
-

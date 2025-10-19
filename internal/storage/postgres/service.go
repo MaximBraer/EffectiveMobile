@@ -4,10 +4,11 @@ import (
 	"EffectiveMobile/internal/storage"
 	"context"
 	"errors"
+	"strings"
+
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-	"strings"
 )
 
 func (s *Storage) AddService(ctx context.Context, name string) (int, error) {

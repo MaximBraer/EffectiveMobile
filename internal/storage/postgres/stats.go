@@ -2,9 +2,10 @@ package postgres
 
 import (
 	"context"
-	"github.com/google/uuid"
 	"strconv"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type GetTotalCostParams struct {

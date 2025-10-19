@@ -6,11 +6,12 @@ import (
 	"EffectiveMobile/internal/storage/postgres"
 	"context"
 	"errors"
-	"github.com/go-chi/chi/middleware"
 	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
+
+	"github.com/go-chi/chi/middleware"
 )
 
 func New(log *slog.Logger, s *postgres.Storage) http.HandlerFunc {
@@ -46,4 +47,3 @@ func New(log *slog.Logger, s *postgres.Storage) http.HandlerFunc {
 		w.WriteHeader(http.StatusNoContent)
 	}
 }
-

@@ -7,14 +7,15 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/go-chi/chi/middleware"
-	"github.com/go-chi/render"
-	"github.com/go-playground/validator/v10"
-	"github.com/google/uuid"
 	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
+
+	"github.com/go-chi/chi/middleware"
+	"github.com/go-chi/render"
+	"github.com/go-playground/validator/v10"
+	"github.com/google/uuid"
 )
 
 type SubscriptionStorage interface {
@@ -126,4 +127,3 @@ func parseMonth(s string) (time.Time, error) {
 func int64ToStr(v int64) string {
 	return strconv.FormatInt(v, 10)
 }
-

@@ -5,11 +5,12 @@ import (
 	"EffectiveMobile/internal/storage/postgres"
 	"context"
 	"encoding/json"
-	"github.com/go-chi/chi/middleware"
-	"github.com/google/uuid"
 	"log/slog"
 	"net/http"
 	"time"
+
+	"github.com/go-chi/chi/middleware"
+	"github.com/google/uuid"
 )
 
 type Response struct {
@@ -127,4 +128,3 @@ func formatUUID(uuid *uuid.UUID) *string {
 	str := uuid.String()
 	return &str
 }
-

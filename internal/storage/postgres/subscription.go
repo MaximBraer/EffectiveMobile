@@ -4,13 +4,14 @@ import (
 	"EffectiveMobile/internal/storage"
 	"context"
 	"errors"
+	"log/slog"
+	"strconv"
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-	"log/slog"
-	"strconv"
-	"time"
 )
 
 type CreateSubscriptionParams struct {

@@ -4,10 +4,11 @@ import (
 	"EffectiveMobile/internal/config"
 	"context"
 	"fmt"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"log/slog"
 	"net/url"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Storage struct {

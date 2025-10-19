@@ -7,16 +7,17 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
-	"github.com/google/uuid"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 	"EffectiveMobile/internal/http-server/handlers/subscription/save"
 	"EffectiveMobile/internal/http-server/handlers/subscription/save/mocks"
 	"EffectiveMobile/internal/lib/logger/handlers/slogdiscard"
 	"EffectiveMobile/internal/storage"
 	"EffectiveMobile/internal/storage/postgres"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSaveHandler(t *testing.T) {
@@ -135,6 +136,17 @@ func TestSaveHandler(t *testing.T) {
 			mockError:      assert.AnError,
 			expectedStatus: http.StatusInternalServerError,
 			expectedError:  "internal server error",
+		},
+		{
+			name: "Invalid JSON",
+			request: save.Request{
+				ServiceName: "Netflix",
+				Price:       500,
+				UserID:      uuid.New(),
+				StartDate:   "01-2024",
+			},
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  "invalid arguments",
 		},
 	}
 

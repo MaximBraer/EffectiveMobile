@@ -24,7 +24,7 @@ func TestSubscriptionE2E(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	
+
 	cfg := config.MustLoad()
 
 	storage, err := postgres.New(ctx, cfg.Storage, slogdiscard.NewDiscardLogger())
@@ -32,7 +32,7 @@ func TestSubscriptionE2E(t *testing.T) {
 	defer storage.Close()
 
 	handler := save.New(slogdiscard.NewDiscardLogger(), storage)
-	
+
 	userID := uuid.New()
 	serviceName := "Netflix"
 	price := 500
@@ -52,28 +52,28 @@ func TestSubscriptionE2E(t *testing.T) {
 
 	req := httptest.NewRequest("POST", "/subscriptions", bytes.NewReader(jsonBody))
 	req.Header.Set("Content-Type", "application/json")
-	
+
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusCreated, w.Code)
-	
+
 	var response map[string]interface{}
 	err = json.Unmarshal(w.Body.Bytes(), &response)
 	require.NoError(t, err)
-	
+
 	assert.Equal(t, "ok", response["status"])
 	subscriptionID := int64(response["id"].(float64))
 	assert.Greater(t, subscriptionID, int64(0))
 
 	subscription, err := storage.GetSubscription(ctx, subscriptionID)
 	require.NoError(t, err)
-	
+
 	assert.Equal(t, serviceName, subscription.ServiceName)
 	assert.Equal(t, price, subscription.Price)
 	assert.Equal(t, userID, subscription.UserID)
 	assert.Equal(t, startDate, subscription.StartDate.Format("01-2006"))
-	
+
 	if subscription.EndDate != nil {
 		assert.Equal(t, endDate, subscription.EndDate.Format("01-2006"))
 	}
@@ -87,7 +87,7 @@ func TestSubscriptionE2E_ValidationErrors(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	
+
 	cfg := config.MustLoad()
 
 	storage, err := postgres.New(ctx, cfg.Storage, slogdiscard.NewDiscardLogger())
@@ -140,7 +140,7 @@ func TestSubscriptionE2E_ValidationErrors(t *testing.T) {
 
 			req := httptest.NewRequest("POST", "/subscriptions", bytes.NewReader(jsonBody))
 			req.Header.Set("Content-Type", "application/json")
-			
+
 			w := httptest.NewRecorder()
 			handler.ServeHTTP(w, req)
 
@@ -155,7 +155,7 @@ func TestSubscriptionE2E_DuplicateSubscription(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	
+
 	cfg := config.MustLoad()
 
 	storage, err := postgres.New(ctx, cfg.Storage, slogdiscard.NewDiscardLogger())
@@ -177,14 +177,14 @@ func TestSubscriptionE2E_DuplicateSubscription(t *testing.T) {
 
 	req := httptest.NewRequest("POST", "/subscriptions", bytes.NewReader(jsonBody))
 	req.Header.Set("Content-Type", "application/json")
-	
+
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusCreated, w.Code)
 	req2 := httptest.NewRequest("POST", "/subscriptions", bytes.NewReader(jsonBody))
 	req2.Header.Set("Content-Type", "application/json")
-	
+
 	w2 := httptest.NewRecorder()
 	handler.ServeHTTP(w2, req2)
 

@@ -7,23 +7,29 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/go-chi/chi/middleware"
 	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
+
+	"github.com/go-chi/chi/middleware"
 )
 
 type Response struct {
-	ID          int64  `json:"id"`
-	ServiceName string `json:"service_name"`
-	Price       int    `json:"price"`
-	UserID      string `json:"user_id"`
-	StartDate   string `json:"start_date"`
+	ID          int64   `json:"id"`
+	ServiceName string  `json:"service_name"`
+	Price       int     `json:"price"`
+	UserID      string  `json:"user_id"`
+	StartDate   string  `json:"start_date"`
 	EndDate     *string `json:"end_date,omitempty"`
 }
 
-func New(log *slog.Logger, s *postgres.Storage) http.HandlerFunc {
+//go:generate go run github.com/vektra/mockery/v2@latest --name=SubscriptionGetter
+type SubscriptionGetter interface {
+	GetSubscription(ctx context.Context, id int64) (postgres.Subscription, error)
+}
+
+func New(log *slog.Logger, s SubscriptionGetter) http.HandlerFunc {
 	const op = "handlers.subscription.get.New"
 	log = log.With(slog.String("op", op))
 
@@ -73,4 +79,3 @@ func formatEndDate(endDate *time.Time) *string {
 	formatted := endDate.Format("01-2006")
 	return &formatted
 }
-
