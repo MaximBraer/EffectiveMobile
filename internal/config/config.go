@@ -1,7 +1,7 @@
 ﻿package config
 
 import (
-	"log"
+	"fmt"
 	"os"
 	"time"
 
@@ -34,21 +34,21 @@ type Storage struct {
 	IdleInTransactionSessionTimeout string        `yaml:"idleInTransactionSessionTimeout" env-default:"5000"`
 }
 
-func MustLoad() *Config {
+func MustLoad() (*Config, error) {
 	configPath := os.Getenv("CONFIG_PATH")
 	if configPath == "" {
-		log.Fatalf("CONFIG_PATH environment variable is not set")
+		return nil, fmt.Errorf("CONFIG_PATH environment variable is not set")
 	}
 
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		log.Fatalf("config file does not exist: %s", configPath)
+		return nil, fmt.Errorf("config file does not exist: %s", configPath)
 	}
 
 	var cfg Config
 
 	if err := cleanenv.ReadConfig(configPath, &cfg); err != nil {
-		log.Fatalf("Cannot read config: %s", err)
+		return nil, fmt.Errorf("cannot read config: %w", err)
 	}
 
-	return &cfg
+	return &cfg, nil
 }

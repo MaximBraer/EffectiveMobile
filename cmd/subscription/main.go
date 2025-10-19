@@ -19,7 +19,11 @@ const (
 
 func main() {
 	cfg := config.MustLoad()
-
+	if err != nil {
+		log.Error("failed to load config", slog.String("err", err.Error()))
+		os.Exit(1)
+	}
+	
 	log := setupLogger(cfg.Env)
 
 	storage, err := postgres.New(context.Background(), cfg.Storage, log)
