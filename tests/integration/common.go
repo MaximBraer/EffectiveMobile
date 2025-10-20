@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	mainHost    = "http://localhost:8082"
+	mainHost    = "http://localhost:8080"
 	serviceHost = "http://localhost:8081"
 )
 
