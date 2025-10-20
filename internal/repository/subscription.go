@@ -6,39 +6,110 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/Masterminds/squirrel"
+	"github.com/google/uuid"
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
-func CreateSubscription(ctx context.Context, db *sql.DB, p CreateSubscriptionParams, log *slog.Logger) (int64, error) {
-	const op = "repository.postgres.CreateSubscription"
+var (
+	ErrSubscriptionAlreadyExists = errors.New("subscription already exists")
+	ErrSubscriptionNotFound      = errors.New("subscription not found")
+	ErrSubscriptionNotCreated    = errors.New("subscription not created")
+)
+
+type CreateSubscriptionParams struct {
+	UserID    uuid.UUID
+	ServiceID int
+	PriceRub  int
+	StartDate time.Time
+	EndDate   *time.Time
+}
+
+type UpdateSubscriptionParams struct {
+	ID        int64
+	PriceRub  *int
+	StartDate *time.Time
+	EndDate   *time.Time
+}
+
+type ListSubscriptionsParams struct {
+	Limit       int
+	Offset      int
+	UserID      *uuid.UUID
+	ServiceName *string
+}
+
+type Subscription struct {
+	ID          int64
+	ServiceName string
+	Price       int
+	UserID      uuid.UUID
+	StartDate   time.Time
+	EndDate     *time.Time
+}
+
+type SubscriptionRepository struct {
+	provider Provider
+	logger   Logger
+}
+
+func NewSubscriptionRepository(provider Provider, logger Logger) *SubscriptionRepository {
+	return &SubscriptionRepository{
+		provider: provider,
+		logger:   logger,
+	}
+}
+
+func (r *SubscriptionRepository) CreateSubscription(ctx context.Context, p CreateSubscriptionParams, log *slog.Logger) (int64, error) {
+	const op = "repository.subscription.CreateSubscription"
 	log = log.With(slog.String("op", op))
+
+	checkQuery, checkArgs, err := squirrel.Select("id").
+		From("subscription").
+		Where(squirrel.Eq{
+			"user_id":    p.UserID,
+			"service_id": p.ServiceID,
+			"start_date": p.StartDate,
+		}).
+		Where(func() squirrel.Eq {
+			if p.EndDate != nil {
+				return squirrel.Eq{"end_date": p.EndDate}
+			}
+			return squirrel.Eq{"end_date": nil}
+		}()).
+		PlaceholderFormat(squirrel.Dollar).
+		ToSql()
+	if err != nil {
+		return 0, fmt.Errorf("could not build check query: %w", err)
+	}
+
+	var existingID int64
+	err = r.provider.GetConn().QueryRowContext(ctx, checkQuery, checkArgs...).Scan(&existingID)
+	if err == nil {
+		return 0, ErrSubscriptionAlreadyExists
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return 0, fmt.Errorf("could not check existing subscription: %w", err)
+	}
 
 	query, args, err := squirrel.Insert("subscription").
 		Columns("user_id", "service_id", "price_rub", "start_date", "end_date").
 		Values(p.UserID, p.ServiceID, p.PriceRub, p.StartDate, p.EndDate).
-		Suffix("RETURNING id").
 		PlaceholderFormat(squirrel.Dollar).
+		Suffix("RETURNING id").
 		ToSql()
 	if err != nil {
 		return 0, fmt.Errorf("could not build query: %w", err)
 	}
 
 	var id int64
-	err = db.QueryRowContext(ctx, query, args...).Scan(&id)
-	if err != nil {
+	if err := r.provider.GetConn().QueryRowContext(ctx, query, args...).Scan(&id); err != nil {
 		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) {
-			switch pgErr.Code {
-			case pgerrcode.UniqueViolation:
-				return 0, ErrSubscriptionAlreadyExists
-			case pgerrcode.ForeignKeyViolation:
-				return 0, ErrServiceNotFound
-			case pgerrcode.CheckViolation:
-				return 0, err
-			}
+		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
+			return 0, ErrSubscriptionAlreadyExists
 		}
 		return 0, err
 	}
@@ -50,7 +121,7 @@ func CreateSubscription(ctx context.Context, db *sql.DB, p CreateSubscriptionPar
 	return id, nil
 }
 
-func GetSubscription(ctx context.Context, db *sql.DB, id int64) (Subscription, error) {
+func (r *SubscriptionRepository) GetSubscription(ctx context.Context, id int64) (Subscription, error) {
 	query, args, err := squirrel.Select(
 		"s.id", "sv.name", "s.price_rub", "s.user_id", "s.start_date", "s.end_date",
 	).
@@ -64,7 +135,7 @@ func GetSubscription(ctx context.Context, db *sql.DB, id int64) (Subscription, e
 	}
 
 	var subscription Subscription
-	err = db.QueryRowContext(ctx, query, args...).Scan(
+	err = r.provider.GetConn().QueryRowContext(ctx, query, args...).Scan(
 		&subscription.ID,
 		&subscription.ServiceName,
 		&subscription.Price,
@@ -72,7 +143,6 @@ func GetSubscription(ctx context.Context, db *sql.DB, id int64) (Subscription, e
 		&subscription.StartDate,
 		&subscription.EndDate,
 	)
-
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return Subscription{}, ErrSubscriptionNotFound
@@ -83,10 +153,8 @@ func GetSubscription(ctx context.Context, db *sql.DB, id int64) (Subscription, e
 	return subscription, nil
 }
 
-func UpdateSubscription(ctx context.Context, db *sql.DB, p UpdateSubscriptionParams) error {
-	queryBuilder := squirrel.Update("subscription").
-		Where(squirrel.Eq{"id": p.ID}).
-		PlaceholderFormat(squirrel.Dollar)
+func (r *SubscriptionRepository) UpdateSubscription(ctx context.Context, p UpdateSubscriptionParams) error {
+	queryBuilder := squirrel.Update("subscription")
 
 	if p.PriceRub != nil {
 		queryBuilder = queryBuilder.Set("price_rub", *p.PriceRub)
@@ -100,19 +168,21 @@ func UpdateSubscription(ctx context.Context, db *sql.DB, p UpdateSubscriptionPar
 		queryBuilder = queryBuilder.Set("end_date", *p.EndDate)
 	}
 
-	query, args, err := queryBuilder.ToSql()
+	queryBuilder = queryBuilder.Where(squirrel.Eq{"id": p.ID})
+
+	query, args, err := queryBuilder.PlaceholderFormat(squirrel.Dollar).ToSql()
 	if err != nil {
 		return fmt.Errorf("could not build query: %w", err)
 	}
 
-	result, err := db.ExecContext(ctx, query, args...)
+	result, err := r.provider.GetConn().ExecContext(ctx, query, args...)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to execute query: %w", err)
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		return err
+		return fmt.Errorf("result.RowsAffected: %w", err)
 	}
 
 	if rowsAffected == 0 {
@@ -122,7 +192,7 @@ func UpdateSubscription(ctx context.Context, db *sql.DB, p UpdateSubscriptionPar
 	return nil
 }
 
-func DeleteSubscription(ctx context.Context, db *sql.DB, id int64) error {
+func (r *SubscriptionRepository) DeleteSubscription(ctx context.Context, id int64) error {
 	query, args, err := squirrel.Delete("subscription").
 		Where(squirrel.Eq{"id": id}).
 		PlaceholderFormat(squirrel.Dollar).
@@ -131,14 +201,14 @@ func DeleteSubscription(ctx context.Context, db *sql.DB, id int64) error {
 		return fmt.Errorf("could not build query: %w", err)
 	}
 
-	result, err := db.ExecContext(ctx, query, args...)
+	result, err := r.provider.GetConn().ExecContext(ctx, query, args...)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to execute query: %w", err)
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		return err
+		return fmt.Errorf("result.RowsAffected: %w", err)
 	}
 
 	if rowsAffected == 0 {
@@ -148,69 +218,79 @@ func DeleteSubscription(ctx context.Context, db *sql.DB, id int64) error {
 	return nil
 }
 
-func ListSubscriptions(ctx context.Context, db *sql.DB, p ListSubscriptionsParams) ([]Subscription, int, error) {
-	baseQuery := squirrel.Select().
-		From("subscription s").
-		Join("service sv ON s.service_id = sv.id").
-		PlaceholderFormat(squirrel.Dollar)
+func (r *SubscriptionRepository) ListSubscriptions(ctx context.Context, p ListSubscriptionsParams) ([]Subscription, int, error) {
+    countBuilder := squirrel.Select("COUNT(*)").
+        From("subscription s").
+        Join("service sv ON s.service_id = sv.id").
+        PlaceholderFormat(squirrel.Dollar)
 
-	whereConditions := squirrel.And{}
+    if p.UserID != nil {
+        countBuilder = countBuilder.Where(squirrel.Eq{"s.user_id": *p.UserID})
+    }
+    if p.ServiceName != nil {
+        countBuilder = countBuilder.Where(squirrel.Eq{"sv.name": *p.ServiceName})
+    }
 
-	if p.UserID != nil {
-		whereConditions = append(whereConditions, squirrel.Eq{"s.user_id": *p.UserID})
-	}
+    countQuery, countArgs, err := countBuilder.ToSql()
+    if err != nil {
+        return nil, 0, fmt.Errorf("could not build count query: %w", err)
+    }
 
-	if p.ServiceName != nil {
-		whereConditions = append(whereConditions, squirrel.Eq{"sv.name": *p.ServiceName})
-	}
+    var total int
+    if err := r.provider.GetConn().QueryRowContext(ctx, countQuery, countArgs...).Scan(&total); err != nil {
+        return nil, 0, fmt.Errorf("failed to get count: %w", err)
+    }
 
-	if len(whereConditions) > 0 {
-		baseQuery = baseQuery.Where(whereConditions)
-	}
+    // Данные
+    dataBuilder := squirrel.Select(
+        "s.id", "sv.name", "s.price_rub", "s.user_id", "s.start_date", "s.end_date",
+    ).
+        From("subscription s").
+        Join("service sv ON s.service_id = sv.id").
+        PlaceholderFormat(squirrel.Dollar)
 
-	// Count query
-	countQuery := baseQuery.Columns("COUNT(*)")
-	countSql, countArgs, err := countQuery.ToSql()
-	if err != nil {
-		return nil, 0, fmt.Errorf("could not build count query: %w", err)
-	}
+    if p.UserID != nil {
+        dataBuilder = dataBuilder.Where(squirrel.Eq{"s.user_id": *p.UserID})
+    }
+    if p.ServiceName != nil {
+        dataBuilder = dataBuilder.Where(squirrel.Eq{"sv.name": *p.ServiceName})
+    }
 
-	var total int
-	if err := db.QueryRowContext(ctx, countSql, countArgs...).Scan(&total); err != nil {
-		return nil, 0, err
-	}
+    if p.Limit > 0 {
+        dataBuilder = dataBuilder.Limit(uint64(p.Limit))
+    }
+    if p.Offset >= 0 {
+        dataBuilder = dataBuilder.Offset(uint64(p.Offset))
+    }
+    dataBuilder = dataBuilder.OrderBy("s.id")
 
-	// Data query
-	dataQuery := baseQuery.Columns(
-		"s.id", "sv.name", "s.price_rub", "s.user_id", "s.start_date", "s.end_date",
-	).OrderBy("s.id").Limit(uint64(p.Limit)).Offset(uint64(p.Offset))
+    query, args, err := dataBuilder.ToSql()
+    if err != nil {
+        return nil, 0, fmt.Errorf("could not build query: %w", err)
+    }
 
-	query, args, err := dataQuery.ToSql()
-	if err != nil {
-		return nil, 0, fmt.Errorf("could not build query: %w", err)
-	}
+    rows, err := r.provider.GetConn().QueryContext(ctx, query, args...)
+    if err != nil {
+        return nil, 0, fmt.Errorf("failed to execute query: %w", err)
+    }
+    defer rows.Close()
 
-	rows, err := db.QueryContext(ctx, query, args...)
-	if err != nil {
-		return nil, 0, err
-	}
-	defer rows.Close()
+    var subscriptions []Subscription
+    for rows.Next() {
+        var subscription Subscription
+        err = rows.Scan(
+            &subscription.ID,
+            &subscription.ServiceName,
+            &subscription.Price,
+            &subscription.UserID,
+            &subscription.StartDate,
+            &subscription.EndDate,
+        )
+        if err != nil {
+            return nil, 0, fmt.Errorf("failed to scan row: %w", err)
+        }
+        subscriptions = append(subscriptions, subscription)
+    }
 
-	var subscriptions []Subscription
-	for rows.Next() {
-		var subscription Subscription
-		if err := rows.Scan(
-			&subscription.ID,
-			&subscription.ServiceName,
-			&subscription.Price,
-			&subscription.UserID,
-			&subscription.StartDate,
-			&subscription.EndDate,
-		); err != nil {
-			return nil, 0, err
-		}
-		subscriptions = append(subscriptions, subscription)
-	}
-
-	return subscriptions, total, nil
+    return subscriptions, total, nil
 }

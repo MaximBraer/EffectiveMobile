@@ -16,6 +16,13 @@ const (
 	envProd  = "prod"
 )
 
+// @title           Subscription API
+// @version         1.0
+// @description     This is a server subscription API.
+// @contact.name    Maksim Braer
+// @contact.email   braer.maks@gmail.com
+// @host            localhost:8080
+// @BasePath        /api/v1.
 func main() {
 	cfg, err := config.MustLoad()
 	if err != nil {
@@ -24,7 +31,7 @@ func main() {
 	}
 
 	log := setupLogger(cfg.Env)
-	log.Info("%s", cfg)
+	log.Info("config loaded", slog.Any("cfg", cfg))
 	provider := postgres.New(
 		cfg.SQLDataBase.User,
 		cfg.SQLDataBase.Password,
@@ -37,11 +44,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	storage := repository.New(provider, log)
+	serviceRepo := repository.NewServiceRepository(provider, log)
+	subscriptionRepo := repository.NewSubscriptionRepository(provider, log)
+	statsRepo := repository.NewStatsRepository(provider, log)
 
-	router := api.NewRouter(log, storage, storage, storage)
+	router := api.NewRouter(log, serviceRepo, subscriptionRepo, statsRepo)
 
-	log.Info("starting server", slog.String("env", cfg.HTTPServer.Address))
+	log.Info("starting server", slog.String("addr", cfg.HTTPServer.Address))
 
 	srv := &http.Server{
 		Addr:         cfg.HTTPServer.Address,
@@ -55,7 +64,7 @@ func main() {
 		log.Error("failed to start server", slog.String("err", err.Error()))
 	}
 
-	log.Error("stopping server", slog.String("env", cfg.Env))
+	log.Info("stopping server", slog.String("env", cfg.Env))
 }
 
 func setupLogger(env string) *slog.Logger {

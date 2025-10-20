@@ -12,7 +12,36 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
-func AddService(ctx context.Context, db *sql.DB, name string) (int, error) {
+var (
+	ErrServiceNotFound         = errors.New("service not found")
+	ErrServiceNameExists       = errors.New("service name already exists")
+	ErrServiceInUse            = errors.New("service is referenced by subscriptions")
+	ErrInvalidDateFormat       = errors.New("invalid date format")
+)
+
+type Provider interface {
+	GetConn() *sql.DB
+}
+
+type Logger interface {
+	Info(msg string, args ...any)
+	Warn(msg string, args ...any)
+	Error(msg string, args ...any)
+}
+
+type ServiceRepository struct {
+	provider Provider
+	logger   Logger
+}
+
+func NewServiceRepository(provider Provider, logger Logger) *ServiceRepository {
+	return &ServiceRepository{
+		provider: provider,
+		logger:   logger,
+	}
+}
+
+func (r *ServiceRepository) AddService(ctx context.Context, name string) (int, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return 0, errors.New("empty service name")
@@ -21,29 +50,25 @@ func AddService(ctx context.Context, db *sql.DB, name string) (int, error) {
 	query, args, err := squirrel.Insert("service").
 		Columns("name").
 		Values(name).
-		Suffix("RETURNING id").
 		PlaceholderFormat(squirrel.Dollar).
+		Suffix("RETURNING id").
 		ToSql()
 	if err != nil {
 		return 0, fmt.Errorf("could not build query: %w", err)
 	}
 
 	var id int
-	err = db.QueryRowContext(ctx, query, args...).Scan(&id)
-	if err != nil {
+	if err := r.provider.GetConn().QueryRowContext(ctx, query, args...).Scan(&id); err != nil {
 		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) {
-			switch pgErr.Code {
-			case pgerrcode.UniqueViolation:
-				return 0, ErrServiceNameExists
-			}
+		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
+			return 0, ErrServiceNameExists
 		}
 		return 0, err
 	}
 	return id, nil
 }
 
-func GetServiceName(ctx context.Context, db *sql.DB, id int) (string, error) {
+func (r *ServiceRepository) GetServiceName(ctx context.Context, id int) (string, error) {
 	query, args, err := squirrel.Select("name").
 		From("service").
 		Where(squirrel.Eq{"id": id}).
@@ -54,7 +79,7 @@ func GetServiceName(ctx context.Context, db *sql.DB, id int) (string, error) {
 	}
 
 	var name string
-	if err := db.QueryRowContext(ctx, query, args...).Scan(&name); err != nil {
+	if err := r.provider.GetConn().QueryRowContext(ctx, query, args...).Scan(&name); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return "", ErrServiceNotFound
 		}
@@ -63,7 +88,7 @@ func GetServiceName(ctx context.Context, db *sql.DB, id int) (string, error) {
 	return name, nil
 }
 
-func GetServiceID(ctx context.Context, db *sql.DB, name string) (int, error) {
+func (r *ServiceRepository) GetServiceID(ctx context.Context, name string) (int, error) {
 	query, args, err := squirrel.Select("id").
 		From("service").
 		Where(squirrel.Eq{"name": name}).
@@ -74,7 +99,7 @@ func GetServiceID(ctx context.Context, db *sql.DB, name string) (int, error) {
 	}
 
 	var id int
-	if err := db.QueryRowContext(ctx, query, args...).Scan(&id); err != nil {
+	if err := r.provider.GetConn().QueryRowContext(ctx, query, args...).Scan(&id); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return 0, ErrServiceNotFound
 		}
@@ -83,31 +108,18 @@ func GetServiceID(ctx context.Context, db *sql.DB, name string) (int, error) {
 	return id, nil
 }
 
-func GetOrCreateServiceID(ctx context.Context, db *sql.DB, name string) (int, error) {
-	name = strings.TrimSpace(name)
-	if name == "" {
-		return 0, errors.New("empty service name")
+func (r *ServiceRepository) GetOrCreateServiceID(ctx context.Context, name string) (int, error) {
+	id, err := r.GetServiceID(ctx, name)
+	if err == nil {
+		return id, nil
 	}
-
-	query, args, err := squirrel.Insert("service").
-		Columns("name").
-		Values(name).
-		Suffix("ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name RETURNING id").
-		PlaceholderFormat(squirrel.Dollar).
-		ToSql()
-	if err != nil {
-		return 0, fmt.Errorf("could not build query: %w", err)
-	}
-
-	var id int
-	err = db.QueryRowContext(ctx, query, args...).Scan(&id)
-	if err != nil {
+	if !errors.Is(err, ErrServiceNotFound) {
 		return 0, err
 	}
-	return id, nil
+	return r.AddService(ctx, name)
 }
 
-func DeleteService(ctx context.Context, db *sql.DB, id int) error {
+func (r *ServiceRepository) DeleteService(ctx context.Context, id int) error {
 	query, args, err := squirrel.Delete("service").
 		Where(squirrel.Eq{"id": id}).
 		PlaceholderFormat(squirrel.Dollar).
@@ -116,7 +128,7 @@ func DeleteService(ctx context.Context, db *sql.DB, id int) error {
 		return fmt.Errorf("could not build query: %w", err)
 	}
 
-	result, err := db.ExecContext(ctx, query, args...)
+	result, err := r.provider.GetConn().ExecContext(ctx, query, args...)
 	if err != nil {
 		return err
 	}
@@ -125,8 +137,28 @@ func DeleteService(ctx context.Context, db *sql.DB, id int) error {
 	if err != nil {
 		return err
 	}
+
 	if rowsAffected == 0 {
 		return ErrServiceNotFound
+	}
+
+	// Проверяем, не используется ли сервис в подписках
+	checkQuery, checkArgs, err := squirrel.Select("COUNT(*)").
+		From("subscription").
+		Where(squirrel.Eq{"service_id": id}).
+		PlaceholderFormat(squirrel.Dollar).
+		ToSql()
+	if err != nil {
+		return fmt.Errorf("could not build check query: %w", err)
+	}
+
+	var count int
+	if err := r.provider.GetConn().QueryRowContext(ctx, checkQuery, checkArgs...).Scan(&count); err != nil {
+		return err
+	}
+
+	if count > 0 {
+		return ErrServiceInUse
 	}
 
 	return nil

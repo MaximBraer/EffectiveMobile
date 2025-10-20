@@ -1,7 +1,9 @@
+//go:generate go run go.uber.org/mock/mockgen@latest -destination=stats_mock.go -source=stats.go -package=handlers
+
 package handlers
 
 import (
-	"EffectiveMobile/internal/service"
+	"EffectiveMobile/internal/repository"
 	"EffectiveMobile/pkg/api/response"
 	"context"
 	"encoding/json"
@@ -13,6 +15,17 @@ import (
 	"github.com/go-chi/chi/middleware"
 	"github.com/google/uuid"
 )
+
+const (
+	ErrInvalidArguments = "invalid arguments"
+)
+
+type StatsService interface {
+	GetTotalCost(ctx context.Context, userID *uuid.UUID, serviceName *string, startDate, endDate *time.Time) (*repository.TotalCostStats, error)
+	ParseMonth(s string) (time.Time, error)
+	FormatDate(date *time.Time) string
+	FormatUUID(uuid *uuid.UUID) *string
+}
 
 type GetTotalStatsRequest struct {
 	UserID      *string `json:"user_id,omitempty"`
@@ -45,7 +58,18 @@ type Filters struct {
 	ServiceName *string `json:"service_name,omitempty"`
 }
 
-func GetTotalStats(log *slog.Logger, statsService *service.StatsService) http.HandlerFunc {
+// @Summary      Get total stats
+// @Tags         stats
+// @Produce      json
+// @Param        user_id       query     string  false  "user uuid"
+// @Param        service_name  query     string  false  "service name"
+// @Param        start_date    query     string  false  "MM-YYYY"
+// @Param        end_date      query     string  false  "MM-YYYY"
+// @Success      200           {object}  GetTotalStatsResponse
+// @Failure      400           {object}  map[string]string
+// @Failure      500           {object}  map[string]string
+// @Router       /stats/total [get]
+func GetTotalStats(subscriptionService SubscriptionService, statsService StatsService, log *slog.Logger) http.HandlerFunc {
 	const op = "handlers.api.stats.GetTotalStats"
 	log = log.With(slog.String("op", op))
 
@@ -76,21 +100,26 @@ func GetTotalStats(log *slog.Logger, statsService *service.StatsService) http.Ha
 		}
 
 		if req.StartDate != nil {
-			if date, err := service.ParseMonth(*req.StartDate); err == nil {
+			if date, err := statsService.ParseMonth(*req.StartDate); err == nil {
 				startDate = &date
 			} else {
-				response.WriteError(w, http.StatusBadRequest, "invalid start_date format")
+				response.WriteError(w, http.StatusBadRequest, ErrInvalidArguments)
 				return
 			}
 		}
 
 		if req.EndDate != nil {
-			if date, err := service.ParseMonth(*req.EndDate); err == nil {
+			if date, err := statsService.ParseMonth(*req.EndDate); err == nil {
 				endDate = &date
 			} else {
-				response.WriteError(w, http.StatusBadRequest, "invalid end_date format")
+				response.WriteError(w, http.StatusBadRequest, ErrInvalidArguments)
 				return
 			}
+		}
+
+		if startDate != nil && endDate != nil && endDate.Before(*startDate) {
+			response.WriteError(w, http.StatusBadRequest, ErrInvalidArguments)
+			return
 		}
 
 		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
@@ -107,11 +136,11 @@ func GetTotalStats(log *slog.Logger, statsService *service.StatsService) http.Ha
 		statsResponse := GetTotalStatsResponse{
 			TotalCost: stats.TotalCost,
 			Period: Period{
-				Start: service.FormatDate(stats.StartDate),
-				End:   service.FormatDate(stats.EndDate),
+				Start: statsService.FormatDate(stats.StartDate),
+				End:   statsService.FormatDate(stats.EndDate),
 			},
 			Filters: Filters{
-				UserID:      service.FormatUUID(stats.UserID),
+				UserID:      statsService.FormatUUID(stats.UserID),
 				ServiceName: stats.ServiceName,
 			},
 			SubscriptionsCount: stats.SubscriptionsCount,
@@ -123,8 +152,8 @@ func GetTotalStats(log *slog.Logger, statsService *service.StatsService) http.Ha
 	}
 }
 
-func GetStatRoutes(log *slog.Logger, statsService *service.StatsService) chi.Router {
+func GetStatRoutes(subscriptionService SubscriptionService, statsService StatsService, log *slog.Logger) chi.Router {
 	r := chi.NewRouter()
-	r.Get("/total", GetTotalStats(log, statsService))
+	r.Get("/total", GetTotalStats(subscriptionService, statsService, log))
 	return r
 }

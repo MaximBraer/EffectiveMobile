@@ -1,8 +1,9 @@
+//go:generate go run go.uber.org/mock/mockgen@latest -destination=subscription_mock.go -source=subscription.go -package=handlers
+
 package handlers
 
 import (
 	"EffectiveMobile/internal/repository"
-	"EffectiveMobile/internal/service"
 	"EffectiveMobile/pkg/api/response"
 	"context"
 	"encoding/json"
@@ -18,6 +19,14 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
 )
+
+type SubscriptionService interface {
+	CreateSubscription(ctx context.Context, serviceName string, price int, userID uuid.UUID, startDate, endDate string) (int64, error)
+	GetSubscription(ctx context.Context, id int64) (*repository.Subscription, error)
+	UpdateSubscription(ctx context.Context, id int64, price *int, startDate, endDate *string) error
+	DeleteSubscription(ctx context.Context, id int64) error
+	ListSubscriptions(ctx context.Context, params repository.ListSubscriptionsParams) ([]repository.Subscription, int, error)
+}
 
 type CreateSubscriptionRequest struct {
 	ServiceName string    `json:"service_name" validate:"required"`
@@ -47,7 +56,17 @@ type GetSubscriptionResponse struct {
 	EndDate     *string `json:"end_date,omitempty"`
 }
 
-func SaveSubscription(log *slog.Logger, service *service.SubscriptionService) http.HandlerFunc {
+// @Summary      Create subscription
+// @Tags         subscriptions
+// @Accept       json
+// @Produce      json
+// @Param        input  body      CreateSubscriptionRequest  true  "Create payload"
+// @Success      201    {object}  CreateSubscriptionResponse
+// @Failure      400    {object}  map[string]string
+// @Failure      409    {object}  map[string]string
+// @Failure      500    {object}  map[string]string
+// @Router       /subscriptions [post]
+func SaveSubscription(subscriptionService SubscriptionService, statsService StatsService, log *slog.Logger) http.HandlerFunc {
 	const op = "handlers.api.subscription.SaveSubscription"
 	log = log.With(slog.String("op", op))
 
@@ -59,25 +78,25 @@ func SaveSubscription(log *slog.Logger, service *service.SubscriptionService) ht
 		var req CreateSubscriptionRequest
 		if err := render.DecodeJSON(r.Body, &req); err != nil {
 			reqLog.Error("failed to decode request", slog.String("err", err.Error()))
-			response.WriteError(w, http.StatusBadRequest, "invalid arguments")
+			response.WriteError(w, http.StatusBadRequest, ErrInvalidArguments)
 			return
 		}
 
 		validate := validator.New()
 		if err := validate.Struct(req); err != nil {
-			response.WriteError(w, http.StatusBadRequest, "invalid arguments")
+			response.WriteError(w, http.StatusBadRequest, ErrInvalidArguments)
 			return
 		}
-
-		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
-		defer cancel()
 
 		var endDate string
 		if req.EndDate != nil {
 			endDate = *req.EndDate
 		}
 
-		id, err := service.CreateSubscription(ctx, req.ServiceName, req.Price, req.UserID, req.StartDate, endDate)
+		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+		defer cancel()
+
+		id, err := subscriptionService.CreateSubscription(ctx, req.ServiceName, req.Price, req.UserID, req.StartDate, endDate)
 		if err != nil {
 			if errors.Is(err, repository.ErrSubscriptionAlreadyExists) {
 				response.WriteError(w, http.StatusConflict, "subscription already exists")
@@ -98,7 +117,16 @@ func SaveSubscription(log *slog.Logger, service *service.SubscriptionService) ht
 	}
 }
 
-func GetSubscription(log *slog.Logger, service *service.SubscriptionService) http.HandlerFunc {
+// @Summary      Get subscription
+// @Tags         subscriptions
+// @Produce      json
+// @Param        id   path      int  true  "Subscription ID"
+// @Success      200  {object}  GetSubscriptionResponse
+// @Failure      400  {object}  map[string]string
+// @Failure      404  {object}  map[string]string
+// @Failure      500  {object}  map[string]string
+// @Router       /subscriptions/{id} [get]
+func GetSubscription(subscriptionService SubscriptionService, statsService StatsService, log *slog.Logger) http.HandlerFunc {
 	const op = "handlers.api.subscription.GetSubscription"
 	log = log.With(slog.String("op", op))
 
@@ -107,7 +135,7 @@ func GetSubscription(log *slog.Logger, service *service.SubscriptionService) htt
 			slog.String("request_id", middleware.GetReqID(r.Context())),
 		)
 
-		idStr := r.URL.Path[len("/api/v1/subscriptions/"):]
+		idStr := chi.URLParam(r, "id")
 		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil || id <= 0 {
 			response.WriteError(w, http.StatusBadRequest, "invalid subscription id")
@@ -117,7 +145,7 @@ func GetSubscription(log *slog.Logger, service *service.SubscriptionService) htt
 		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 		defer cancel()
 
-		subscription, err := service.GetSubscription(ctx, id)
+		subscription, err := subscriptionService.GetSubscription(ctx, id)
 		if err != nil {
 			if errors.Is(err, repository.ErrSubscriptionNotFound) {
 				response.WriteError(w, http.StatusNotFound, "subscription not found")
@@ -146,7 +174,19 @@ func GetSubscription(log *slog.Logger, service *service.SubscriptionService) htt
 	}
 }
 
-func UpdateSubscription(log *slog.Logger, service *service.SubscriptionService) http.HandlerFunc {
+// @Summary      Update subscription
+// @Tags         subscriptions
+// @Accept       json
+// @Produce      json
+// @Param        id     path      int                       true  "Subscription ID"
+// @Param        input  body      UpdateSubscriptionRequest  true  "Update payload"
+// @Success      200    {object}  map[string]string
+// @Failure      400    {object}  map[string]string
+// @Failure      404    {object}  map[string]string
+// @Failure      409    {object}  map[string]string
+// @Failure      500    {object}  map[string]string
+// @Router       /subscriptions/{id} [put]
+func UpdateSubscription(subscriptionService SubscriptionService, statsService StatsService, log *slog.Logger) http.HandlerFunc {
 	const op = "handlers.api.subscription.UpdateSubscription"
 	log = log.With(slog.String("op", op))
 
@@ -155,7 +195,7 @@ func UpdateSubscription(log *slog.Logger, service *service.SubscriptionService) 
 			slog.String("request_id", middleware.GetReqID(r.Context())),
 		)
 
-		idStr := r.URL.Path[len("/api/v1/subscriptions/"):]
+		idStr := chi.URLParam(r, "id")
 		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			response.WriteError(w, http.StatusBadRequest, "invalid subscription id")
@@ -183,7 +223,7 @@ func UpdateSubscription(log *slog.Logger, service *service.SubscriptionService) 
 		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 		defer cancel()
 
-		err = service.UpdateSubscription(ctx, id, req.Price, req.StartDate, req.EndDate)
+		err = subscriptionService.UpdateSubscription(ctx, id, req.Price, req.StartDate, req.EndDate)
 		if err != nil {
 			if errors.Is(err, repository.ErrSubscriptionNotFound) {
 				response.WriteError(w, http.StatusNotFound, "subscription not found")
@@ -205,7 +245,15 @@ func UpdateSubscription(log *slog.Logger, service *service.SubscriptionService) 
 	}
 }
 
-func DeleteSubscription(log *slog.Logger, service *service.SubscriptionService) http.HandlerFunc {
+// @Summary      Delete subscription
+// @Tags         subscriptions
+// @Param        id   path  int  true  "Subscription ID"
+// @Success      204  {string}  string  "No content"
+// @Failure      400  {object}  map[string]string
+// @Failure      404  {object}  map[string]string
+// @Failure      500  {object}  map[string]string
+// @Router       /subscriptions/{id} [delete]
+func DeleteSubscription(subscriptionService SubscriptionService, statsService StatsService, log *slog.Logger) http.HandlerFunc {
 	const op = "handlers.api.subscription.DeleteSubscription"
 	log = log.With(slog.String("op", op))
 
@@ -214,7 +262,7 @@ func DeleteSubscription(log *slog.Logger, service *service.SubscriptionService) 
 			slog.String("request_id", middleware.GetReqID(r.Context())),
 		)
 
-		idStr := r.URL.Path[len("/api/v1/subscriptions/"):]
+		idStr := chi.URLParam(r, "id")
 		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			response.WriteError(w, http.StatusBadRequest, "invalid subscription id")
@@ -224,7 +272,7 @@ func DeleteSubscription(log *slog.Logger, service *service.SubscriptionService) 
 		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 		defer cancel()
 
-		err = service.DeleteSubscription(ctx, id)
+		err = subscriptionService.DeleteSubscription(ctx, id)
 		if err != nil {
 			if errors.Is(err, repository.ErrSubscriptionNotFound) {
 				response.WriteError(w, http.StatusNotFound, "subscription not found")
@@ -239,7 +287,17 @@ func DeleteSubscription(log *slog.Logger, service *service.SubscriptionService) 
 	}
 }
 
-func ListSubscriptions(log *slog.Logger, service *service.SubscriptionService) http.HandlerFunc {
+// @Summary      List subscriptions
+// @Tags         subscriptions
+// @Produce      json
+// @Param        limit         query     int     false  "limit"   minimum(1)  default(10)
+// @Param        offset        query     int     false  "offset"  minimum(0)  default(0)
+// @Param        user_id       query     string  false  "user uuid"
+// @Param        service_name  query     string  false  "service name"
+// @Success      200           {object}  map[string]interface{}
+// @Failure      500           {object}  map[string]string
+// @Router       /subscriptions [get]
+func ListSubscriptions(subscriptionService SubscriptionService, statsService StatsService, log *slog.Logger) http.HandlerFunc {
 	const op = "handlers.api.subscription.ListSubscriptions"
 	log = log.With(slog.String("op", op))
 
@@ -280,7 +338,7 @@ func ListSubscriptions(log *slog.Logger, service *service.SubscriptionService) h
 			serviceNamePtr = &serviceName
 		}
 
-		subscriptions, total, err := service.ListSubscriptions(r.Context(), repository.ListSubscriptionsParams{
+		subscriptions, total, err := subscriptionService.ListSubscriptions(r.Context(), repository.ListSubscriptionsParams{
 			Limit:       limit,
 			Offset:      offset,
 			UserID:      userID,
@@ -306,12 +364,12 @@ func ListSubscriptions(log *slog.Logger, service *service.SubscriptionService) h
 	}
 }
 
-func GetSubscriptionsRoutes(log *slog.Logger, service *service.SubscriptionService) chi.Router {
+func GetSubscriptionsRoutes(subscriptionService SubscriptionService, statsService StatsService, log *slog.Logger) chi.Router {
 	r := chi.NewRouter()
-	r.Post("/", SaveSubscription(log, service))
-	r.Get("/", ListSubscriptions(log, service))
-	r.Get("/{id}", GetSubscription(log, service))
-	r.Put("/{id}", UpdateSubscription(log, service))
-	r.Delete("/{id}", DeleteSubscription(log, service))
+	r.Post("/", SaveSubscription(subscriptionService, statsService, log))
+	r.Get("/", ListSubscriptions(subscriptionService, statsService, log))
+	r.Get("/{id}", GetSubscription(subscriptionService, statsService, log))
+	r.Put("/{id}", UpdateSubscription(subscriptionService, statsService, log))
+	r.Delete("/{id}", DeleteSubscription(subscriptionService, statsService, log))
 	return r
 }

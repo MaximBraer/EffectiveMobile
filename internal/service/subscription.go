@@ -5,6 +5,7 @@ package service
 import (
 	"EffectiveMobile/internal/repository"
 	"context"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -45,24 +46,27 @@ func (s *SubscriptionService) CreateSubscription(ctx context.Context, serviceNam
 	const op = "service.subscription.CreateSubscription"
 	log := s.log.With(slog.String("op", op))
 
-	serviceID, err := s.serviceRepo.GetOrCreateServiceID(ctx, serviceName)
-	if err != nil {
-		log.Error("get or create service failed", slog.String("err", err.Error()))
-		return 0, err
-	}
-
-	startDateParsed, err := parseMonth(startDate)
+	startDateParsed, err := s.ParseMonth(startDate)
 	if err != nil {
 		return 0, err
 	}
 
 	var endDatePtr *time.Time
 	if endDate != "" {
-		ed, err := parseMonth(endDate)
-		if err != nil || ed.Before(startDateParsed) {
+		ed, err := s.ParseMonth(endDate)
+		if err != nil {
 			return 0, err
 		}
+		if ed.Before(startDateParsed) {
+			return 0, fmt.Errorf("end date must be after start date")
+		}
 		endDatePtr = &ed
+	}
+
+	serviceID, err := s.serviceRepo.GetOrCreateServiceID(ctx, serviceName)
+	if err != nil {
+		log.Error("get or create service failed", slog.String("err", err.Error()))
+		return 0, err
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -117,7 +121,7 @@ func (s *SubscriptionService) UpdateSubscription(ctx context.Context, id int64, 
 	}
 
 	if startDate != nil {
-		startDateParsed, err := parseMonth(*startDate)
+		startDateParsed, err := s.ParseMonth(*startDate)
 		if err != nil {
 			return err
 		}
@@ -127,7 +131,7 @@ func (s *SubscriptionService) UpdateSubscription(ctx context.Context, id int64, 
 	}
 
 	if endDate != nil {
-		endDateParsed, err := parseMonth(*endDate)
+		endDateParsed, err := s.ParseMonth(*endDate)
 		if err != nil {
 			return err
 		}
@@ -160,8 +164,8 @@ func (s *SubscriptionService) DeleteSubscription(ctx context.Context, id int64) 
 	return nil
 }
 
-func parseMonth(s string) (time.Time, error) {
-	t, err := time.Parse("01-2006", s)
+func (s *SubscriptionService) ParseMonth(monthStr string) (time.Time, error) {
+	t, err := time.Parse("01-2006", monthStr)
 	if err != nil {
 		return time.Time{}, err
 	}

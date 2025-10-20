@@ -166,11 +166,11 @@ GET /api/v1/stats/total?user_id={user_id}&start_date={start_date}&end_date={end_
 # Unit тесты (быстрые, с моками)
 make test-unit
 
-# E2E тесты (медленные, с реальной БД)
-make test-e2e
+# Интеграционные тесты (нужна запущенная БД PostgreSQL на 5433)
+make test-integration
 
-# Полный цикл E2E тестирования
-make test-e2e-full
+# Все тесты
+make test-all
 
 # Применение миграций БД
 make migrate-up
@@ -183,9 +183,24 @@ make reset-db
 
 Проект включает комплексное тестирование:
 
-- **Unit тесты**: Быстрые тесты с моками для отдельных компонентов
-- **E2E тесты**: Полные интеграционные тесты с реальной базой данных
-- **Покрытие тестами**: Все обработчики и бизнес-логика покрыты тестами
+- **Unit тесты**: быстрые тесты с моками для API и сервисов
+- **Интеграционные тесты**: реальные HTTP-запросы к запущенному сервису и реальной БД
+
+Запуск на Windows (PowerShell):
+```powershell
+$env:INTEGRATION_TESTS="true"; go test -v ./tests/integration/...
+```
+
+Запуск всех тестов:
+```powershell
+$env:INTEGRATION_TESTS="true"; go test -v ./...
+```
+
+Перед интеграционными тестами поднимите инфраструктуру и примените миграции:
+```powershell
+docker-compose up -d
+go run cmd/migrator/main.go -dsn "postgres://postgres:postgres@localhost:5433/subscriptions?sslmode=disable" -migrations-path "migrations"
+```
 
 ## Конфигурация
 
@@ -197,4 +212,12 @@ make reset-db
 
 ```bash
 go run cmd/migrator/main.go -dsn "your-dsn" -migrations-path "migrations"
+```
+
+## Генерация моков
+
+Используем `go.uber.org/mock`:
+```bash
+go run go.uber.org/mock/mockgen@latest -source=internal/service/subscription.go -destination=internal/service/subscription_mock.go -package=service
+go run go.uber.org/mock/mockgen@latest -source=internal/service/stats.go -destination=internal/service/stats_mock.go -package=service
 ```

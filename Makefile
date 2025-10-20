@@ -1,12 +1,18 @@
-.PHONY: test test-unit test-e2e test-all docker-up docker-down migrate-up migrate-down test-e2e-full reset-db clean
+.PHONY: test test-unit test-integration test-all docker-up docker-down migrate-up migrate-down reset-db clean
 
 test-unit:
 	@echo "Running unit tests..."
-	go test -v ./internal/http-server/handlers/subscription/save
+	go test -v ./internal/...
 
-test-e2e:
-	@echo "Running E2E tests..."
-	go test -v ./tests/e2e
+test-integration:
+	@echo "Running integration tests..."
+	INTEGRATION_TESTS=true go test -v ./tests/integration/...
+
+test-all: test-unit test-integration
+
+test-short:
+	@echo "Running short tests..."
+	go test -short -v ./...
 
 migrate-up:
 	@echo "Applying database migrations..."
@@ -15,12 +21,6 @@ migrate-up:
 migrate-down:
 	@echo "Rolling back database migrations..."
 	go run cmd/migrator/main.go -dsn "postgres://postgres:postgres@localhost:5433/subscriptions?sslmode=disable" -migrations-path "migrations" -down
-
-test-all: test-unit test-e2e
-
-test-short:
-	@echo "Running short tests..."
-	go test -short -v ./...
 
 docker-up:
 	@echo "Starting Docker environment..."
@@ -32,11 +32,8 @@ docker-down:
 	@echo "Stopping Docker environment..."
 	docker-compose down
 
-test-e2e-full: docker-up migrate-up test-e2e docker-down
+gen_swagger:
+	go run github.com/swaggo/swag/cmd/swag@latest init --requiredByDefault --parseDependency --parseInternal --parseDepth 2 --parseGoList --output=./.static/swagger --outputTypes=json -g ./cmd/main.go
 
 reset-db: docker-down clean docker-up migrate-up
 
-clean:
-	@echo "Cleaning up..."
-	docker-compose down -v
-	rm -rf pgdata/

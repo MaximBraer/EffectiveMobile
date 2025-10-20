@@ -11,7 +11,6 @@ import (
 	"github.com/google/uuid"
 )
 
-// Repository interface
 type StatsRepository interface {
 	GetTotalCost(ctx context.Context, p repository.GetTotalCostParams) (repository.TotalCostStats, error)
 }
@@ -46,22 +45,22 @@ func (s *StatsService) GetTotalCost(ctx context.Context, userID *uuid.UUID, serv
 	return &stats, nil
 }
 
-func ParseMonth(s string) (time.Time, error) {
-	t, err := time.Parse("01-2006", s)
+func (s *StatsService) ParseMonth(monthStr string) (time.Time, error) {
+	t, err := time.Parse("01-2006", monthStr)
 	if err != nil {
 		return time.Time{}, err
 	}
 	return time.Date(t.Year(), t.Month(), 1, 0, 0, 0, 0, time.UTC), nil
 }
 
-func FormatDate(date *time.Time) string {
+func (s *StatsService) FormatDate(date *time.Time) string {
 	if date == nil {
 		return ""
 	}
 	return date.Format("2006-01-02")
 }
 
-func FormatUUID(uuid *uuid.UUID) *string {
+func (s *StatsService) FormatUUID(uuid *uuid.UUID) *string {
 	if uuid == nil {
 		return nil
 	}

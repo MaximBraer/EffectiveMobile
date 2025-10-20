@@ -2,13 +2,42 @@ package repository
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
+	"time"
 
 	"github.com/Masterminds/squirrel"
+	"github.com/google/uuid"
 )
 
-func GetTotalCost(ctx context.Context, db *sql.DB, p GetTotalCostParams) (TotalCostStats, error) {
+type GetTotalCostParams struct {
+	UserID      *uuid.UUID
+	ServiceName *string
+	StartDate   *time.Time
+	EndDate     *time.Time
+}
+
+type TotalCostStats struct {
+	TotalCost          int
+	StartDate          *time.Time
+	EndDate            *time.Time
+	UserID             *uuid.UUID
+	ServiceName        *string
+	SubscriptionsCount int
+}
+
+type StatsRepository struct {
+	provider Provider
+	logger   Logger
+}
+
+func NewStatsRepository(provider Provider, logger Logger) *StatsRepository {
+	return &StatsRepository{
+		provider: provider,
+		logger:   logger,
+	}
+}
+
+func (r *StatsRepository) GetTotalCost(ctx context.Context, p GetTotalCostParams) (TotalCostStats, error) {
 	baseQuery := squirrel.Select().
 		From("subscription s").
 		Join("service sv ON s.service_id = sv.id").
@@ -29,43 +58,37 @@ func GetTotalCost(ctx context.Context, db *sql.DB, p GetTotalCostParams) (TotalC
 	}
 
 	if p.EndDate != nil {
-		whereConditions = append(whereConditions, squirrel.Or{
-			squirrel.Eq{"s.end_date": nil},
-			squirrel.LtOrEq{"s.end_date": *p.EndDate},
-		})
+		whereConditions = append(whereConditions, squirrel.LtOrEq{"s.start_date": *p.EndDate})
 	}
 
 	if len(whereConditions) > 0 {
 		baseQuery = baseQuery.Where(whereConditions)
 	}
 
-	query := baseQuery.Columns(
-		"COALESCE(SUM(s.price_rub), 0) as total_cost",
-		"MIN(s.start_date) as start_date",
-		"MAX(COALESCE(s.end_date, s.start_date)) as end_date",
-		"COUNT(*) as subscriptions_count",
-	)
-
-	querySql, queryArgs, err := query.ToSql()
+	query, args, err := baseQuery.
+		Columns(
+			"COALESCE(SUM(s.price_rub), 0) as total_cost",
+			"COUNT(*) as subscriptions_count",
+		).
+		ToSql()
 	if err != nil {
 		return TotalCostStats{}, fmt.Errorf("could not build query: %w", err)
 	}
 
 	var stats TotalCostStats
-	err = db.QueryRowContext(ctx, querySql, queryArgs...).Scan(
+	err = r.provider.GetConn().QueryRowContext(ctx, query, args...).Scan(
 		&stats.TotalCost,
-		&stats.StartDate,
-		&stats.EndDate,
 		&stats.SubscriptionsCount,
 	)
+	if err != nil {
+		return TotalCostStats{}, fmt.Errorf("failed to execute query: %w", err)
+	}
 
-	// Set UserID and ServiceName from parameters
+	// Устанавливаем параметры запроса в результат
 	stats.UserID = p.UserID
 	stats.ServiceName = p.ServiceName
-
-	if err != nil {
-		return TotalCostStats{}, err
-	}
+	stats.StartDate = p.StartDate
+	stats.EndDate = p.EndDate
 
 	return stats, nil
 }

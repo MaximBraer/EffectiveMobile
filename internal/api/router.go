@@ -1,18 +1,18 @@
 package api
 
-//go:generate mockgen -destination=router_mock.go -source=router.go -package=api
-
 import (
 	"EffectiveMobile/internal/api/handlers"
 	"EffectiveMobile/internal/api/middleware/logger"
+	"EffectiveMobile/internal/repository"
 	"EffectiveMobile/internal/service"
 	"log/slog"
+	"net/http"
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
 )
 
-func NewRouter(log *slog.Logger, repo service.ServicesRepository, subscriptionRepo service.SubscriptionRepository, statsRepo service.StatsRepository) chi.Router {
+func NewRouter(log *slog.Logger, serviceRepo *repository.ServiceRepository, subscriptionRepo *repository.SubscriptionRepository, statsRepo *repository.StatsRepository) chi.Router {
 	router := chi.NewRouter()
 
 	router.Use(middleware.RequestID)
@@ -21,14 +21,19 @@ func NewRouter(log *slog.Logger, repo service.ServicesRepository, subscriptionRe
 
 	router.Use(logger.New(log))
 
-	subscriptionService := service.NewSubscriptionService(repo, subscriptionRepo, log)
+	subscriptionService := service.NewSubscriptionService(serviceRepo, subscriptionRepo, log)
+	statsService := service.NewStatsService(statsRepo, log)
 
 	router.Route("/api/v1", func(r chi.Router) {
 		r.Route("/subscriptions", func(r chi.Router) {
-			r.Mount("/", handlers.GetSubscriptionsRoutes(log, subscriptionService))
+			r.Mount("/", handlers.GetSubscriptionsRoutes(subscriptionService, statsService, log))
 		})
-		statsService := service.NewStatsService(statsRepo, log)
-		r.Mount("/stats", handlers.GetStatRoutes(log, statsService))
+		r.Mount("/stats", handlers.GetStatRoutes(subscriptionService, statsService, log))
+	})
+
+	router.Route("/swagger", func(r chi.Router) {
+		fs := http.StripPrefix("/swagger/", http.FileServer(http.Dir(".static/swagger")))
+		r.Get("/*", fs.ServeHTTP)
 	})
 
 	return router

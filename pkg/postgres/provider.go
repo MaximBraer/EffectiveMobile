@@ -69,3 +69,10 @@ func (p *Provider) Open() error {
 func (p *Provider) GetConn() *sql.DB {
 	return p.db
 }
+
+func (p *Provider) Close() error {
+	if p.db != nil {
+		return p.db.Close()
+	}
+	return nil
+}
