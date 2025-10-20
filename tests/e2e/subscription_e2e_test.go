@@ -1,6 +1,8 @@
 package e2e
 
 import (
+	"EffectiveMobile/internal/repository"
+	"EffectiveMobile/pkg/logger/handlers/slogdiscard"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -15,8 +17,6 @@ import (
 
 	"EffectiveMobile/internal/api/handlers"
 	"EffectiveMobile/internal/config"
-	"EffectiveMobile/internal/lib/logger/handlers/slogdiscard"
-	"EffectiveMobile/internal/storage/postgres"
 )
 
 func TestSubscriptionE2E(t *testing.T) {
@@ -30,7 +30,7 @@ func TestSubscriptionE2E(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	storage, err := postgres.New(ctx, cfg.Storage, slogdiscard.NewDiscardLogger())
+	storage, err := repository.New(ctx, cfg.Storage, slogdiscard.NewDiscardLogger())
 	require.NoError(t, err)
 	defer storage.Close()
 
@@ -67,10 +67,10 @@ func TestSubscriptionE2E(t *testing.T) {
 			},
 		},
 		{
-			name:   "Get subscription",
-			method: "GET",
-			path:   "/api/v1/subscriptions/1",
-			body:   nil,
+			name:           "Get subscription",
+			method:         "GET",
+			path:           "/api/v1/subscriptions/1",
+			body:           nil,
 			expectedStatus: http.StatusOK,
 			validate: func(t *testing.T, response map[string]interface{}) {
 				assert.Equal(t, serviceName, response["service_name"])
@@ -93,10 +93,10 @@ func TestSubscriptionE2E(t *testing.T) {
 			},
 		},
 		{
-			name:   "Get updated subscription",
-			method: "GET",
-			path:   "/api/v1/subscriptions/1",
-			body:   nil,
+			name:           "Get updated subscription",
+			method:         "GET",
+			path:           "/api/v1/subscriptions/1",
+			body:           nil,
 			expectedStatus: http.StatusOK,
 			validate: func(t *testing.T, response map[string]interface{}) {
 				assert.Equal(t, serviceName, response["service_name"])
@@ -107,10 +107,10 @@ func TestSubscriptionE2E(t *testing.T) {
 			},
 		},
 		{
-			name:   "List subscriptions",
-			method: "GET",
-			path:   "/api/v1/subscriptions",
-			body:   nil,
+			name:           "List subscriptions",
+			method:         "GET",
+			path:           "/api/v1/subscriptions",
+			body:           nil,
 			expectedStatus: http.StatusOK,
 			validate: func(t *testing.T, response map[string]interface{}) {
 				subscriptions := response["subscriptions"].([]interface{})
@@ -121,10 +121,10 @@ func TestSubscriptionE2E(t *testing.T) {
 			},
 		},
 		{
-			name:   "Get stats",
-			method: "GET",
-			path:   "/api/v1/stats/total",
-			body:   nil,
+			name:           "Get stats",
+			method:         "GET",
+			path:           "/api/v1/stats/total",
+			body:           nil,
 			expectedStatus: http.StatusOK,
 			validate: func(t *testing.T, response map[string]interface{}) {
 				assert.Equal(t, float64(600), response["total_cost"])
@@ -132,10 +132,10 @@ func TestSubscriptionE2E(t *testing.T) {
 			},
 		},
 		{
-			name:   "Delete subscription",
-			method: "DELETE",
-			path:   "/api/v1/subscriptions/1",
-			body:   nil,
+			name:           "Delete subscription",
+			method:         "DELETE",
+			path:           "/api/v1/subscriptions/1",
+			body:           nil,
 			expectedStatus: http.StatusNoContent,
 			validate: func(t *testing.T, response map[string]interface{}) {
 			},

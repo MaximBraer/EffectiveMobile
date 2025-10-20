@@ -3,15 +3,13 @@ http_server:
   address: "0.0.0.0:8082"
   timeout: 4s
   idle_timeout: 60s
-storage:
-  address: "postgres:5432"
+sql_data_base:
   user: "postgres"
   password: "postgres"
-  database: "subscriptions"
-  minConns: 2
-  maxConns: 10
-  maxConnLifetime: 3600s
-  HealthCheckPeriod: 30s
-  MaxConnIdleTime: 60s
-  StatementTimeout: 5000
-  IdleInTransactionSessionTimeout: 5000
+  data_base_info:
+    server: "postgres"
+    database: "subscriptions"
+    max_idle_cons: 2
+    max_open_cons: 10
+    conn_max_lifetime: 3600
+    port: "5432"

@@ -1,8 +1,8 @@
 package handlers
 
 import (
-	"EffectiveMobile/internal/lib/api/response"
-	"EffectiveMobile/internal/storage/postgres"
+	"EffectiveMobile/internal/service"
+	"EffectiveMobile/pkg/api/response"
 	"context"
 	"encoding/json"
 	"log/slog"
@@ -14,11 +14,25 @@ import (
 	"github.com/google/uuid"
 )
 
-type Response struct {
+type GetTotalStatsRequest struct {
+	UserID      *string `json:"user_id,omitempty"`
+	ServiceName *string `json:"service_name,omitempty"`
+	StartDate   *string `json:"start_date,omitempty"`
+	EndDate     *string `json:"end_date,omitempty"`
+}
+
+type GetTotalStatsResponse struct {
 	TotalCost          int     `json:"total_cost"`
 	Period             Period  `json:"period"`
 	Filters            Filters `json:"filters"`
 	SubscriptionsCount int     `json:"subscriptions_count"`
+}
+
+func getStringParam(r *http.Request, key string) *string {
+	if value := r.URL.Query().Get(key); value != "" {
+		return &value
+	}
+	return nil
 }
 
 type Period struct {
@@ -31,7 +45,7 @@ type Filters struct {
 	ServiceName *string `json:"service_name,omitempty"`
 }
 
-func GetTotalStats(log *slog.Logger, s *postgres.Storage) http.HandlerFunc {
+func GetTotalStats(log *slog.Logger, statsService *service.StatsService) http.HandlerFunc {
 	const op = "handlers.api.stats.GetTotalStats"
 	log = log.With(slog.String("op", op))
 
@@ -40,22 +54,29 @@ func GetTotalStats(log *slog.Logger, s *postgres.Storage) http.HandlerFunc {
 			slog.String("request_id", middleware.GetReqID(r.Context())),
 		)
 
+		req := GetTotalStatsRequest{
+			UserID:      getStringParam(r, "user_id"),
+			ServiceName: getStringParam(r, "service_name"),
+			StartDate:   getStringParam(r, "start_date"),
+			EndDate:     getStringParam(r, "end_date"),
+		}
+
 		var userID *uuid.UUID
 		var serviceName *string
 		var startDate, endDate *time.Time
 
-		if userIDStr := r.URL.Query().Get("user_id"); userIDStr != "" {
-			if id, err := uuid.Parse(userIDStr); err == nil {
+		if req.UserID != nil {
+			if id, err := uuid.Parse(*req.UserID); err == nil {
 				userID = &id
 			}
 		}
 
-		if serviceNameStr := r.URL.Query().Get("service_name"); serviceNameStr != "" {
-			serviceName = &serviceNameStr
+		if req.ServiceName != nil {
+			serviceName = req.ServiceName
 		}
 
-		if startDateStr := r.URL.Query().Get("start_date"); startDateStr != "" {
-			if date, err := parseMonth(startDateStr); err == nil {
+		if req.StartDate != nil {
+			if date, err := service.ParseMonth(*req.StartDate); err == nil {
 				startDate = &date
 			} else {
 				response.WriteError(w, http.StatusBadRequest, "invalid start_date format")
@@ -63,8 +84,8 @@ func GetTotalStats(log *slog.Logger, s *postgres.Storage) http.HandlerFunc {
 			}
 		}
 
-		if endDateStr := r.URL.Query().Get("end_date"); endDateStr != "" {
-			if date, err := parseMonth(endDateStr); err == nil {
+		if req.EndDate != nil {
+			if date, err := service.ParseMonth(*req.EndDate); err == nil {
 				endDate = &date
 			} else {
 				response.WriteError(w, http.StatusBadRequest, "invalid end_date format")
@@ -75,12 +96,7 @@ func GetTotalStats(log *slog.Logger, s *postgres.Storage) http.HandlerFunc {
 		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 		defer cancel()
 
-		stats, err := s.GetTotalCost(ctx, postgres.GetTotalCostParams{
-			UserID:      userID,
-			ServiceName: serviceName,
-			StartDate:   startDate,
-			EndDate:     endDate,
-		})
+		stats, err := statsService.GetTotalCost(ctx, userID, serviceName, startDate, endDate)
 
 		if err != nil {
 			reqLog.Error("get total cost failed", slog.String("err", err.Error()))
@@ -88,14 +104,14 @@ func GetTotalStats(log *slog.Logger, s *postgres.Storage) http.HandlerFunc {
 			return
 		}
 
-		response := Response{
+		statsResponse := GetTotalStatsResponse{
 			TotalCost: stats.TotalCost,
 			Period: Period{
-				Start: formatDate(stats.StartDate),
-				End:   formatDate(stats.EndDate),
+				Start: service.FormatDate(stats.StartDate),
+				End:   service.FormatDate(stats.EndDate),
 			},
 			Filters: Filters{
-				UserID:      formatUUID(stats.UserID),
+				UserID:      service.FormatUUID(stats.UserID),
 				ServiceName: stats.ServiceName,
 			},
 			SubscriptionsCount: stats.SubscriptionsCount,
@@ -103,35 +119,12 @@ func GetTotalStats(log *slog.Logger, s *postgres.Storage) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(response)
+		_ = json.NewEncoder(w).Encode(statsResponse)
 	}
 }
 
-func parseMonth(s string) (time.Time, error) {
-	t, err := time.Parse("01-2006", s)
-	if err != nil {
-		return time.Time{}, err
-	}
-	return time.Date(t.Year(), t.Month(), 1, 0, 0, 0, 0, time.UTC), nil
-}
-
-func formatDate(date *time.Time) string {
-	if date == nil {
-		return ""
-	}
-	return date.Format("2006-01-02")
-}
-
-func formatUUID(uuid *uuid.UUID) *string {
-	if uuid == nil {
-		return nil
-	}
-	str := uuid.String()
-	return &str
-}
-
-func GetStatRoutes(log *slog.Logger, s *postgres.Storage) chi.Router {
+func GetStatRoutes(log *slog.Logger, statsService *service.StatsService) chi.Router {
 	r := chi.NewRouter()
-	r.Get("/total", GetTotalStats(log, s))
+	r.Get("/total", GetTotalStats(log, statsService))
 	return r
 }

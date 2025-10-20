@@ -2,10 +2,9 @@
 
 import (
 	"EffectiveMobile/internal/api"
-	"EffectiveMobile/internal/api/middleware/logger"
 	"EffectiveMobile/internal/config"
-	"EffectiveMobile/internal/storage/postgres"
-	"context"
+	"EffectiveMobile/internal/repository"
+	"EffectiveMobile/pkg/postgres"
 	"log/slog"
 	"net/http"
 	"os"
@@ -18,21 +17,29 @@ const (
 )
 
 func main() {
-	cfg := config.MustLoad()
+	cfg, err := config.MustLoad()
 	if err != nil {
-		log.Error("failed to load config", slog.String("err", err.Error()))
+		slog.Error("failed to load config", slog.String("err", err.Error()))
 		os.Exit(1)
 	}
-	
+
 	log := setupLogger(cfg.Env)
+	log.Info("%s", cfg)
+	provider := postgres.New(
+		cfg.SQLDataBase.User,
+		cfg.SQLDataBase.Password,
+		cfg.SQLDataBase.DataBaseInfo,
+		log,
+	)
 
-	storage, err := postgres.New(context.Background(), cfg.Storage, log)
-	if err != nil {
-		log.Error("failed to init storage", slog.String("err", err.Error()))
+	if err := provider.Open(); err != nil {
+		log.Error("failed to open provider", slog.String("err", err.Error()))
 		os.Exit(1)
 	}
 
-	router := api.NewRouter(log, storage)
+	storage := repository.New(provider, log)
+
+	router := api.NewRouter(log, storage, storage, storage)
 
 	log.Info("starting server", slog.String("env", cfg.HTTPServer.Address))
 
