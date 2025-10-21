@@ -55,33 +55,27 @@ func (r *StatsRepository) GetTotalCost(ctx context.Context, p GetTotalCostParams
 		Join("service sv ON s.service_id = sv.id").
 		PlaceholderFormat(squirrel.Dollar)
 
-	whereConditions := squirrel.And{}
-
 	if p.UserID != nil {
-		whereConditions = append(whereConditions, squirrel.Eq{"s.user_id": *p.UserID})
+		baseQuery = baseQuery.Where(squirrel.Eq{"s.user_id": *p.UserID})
 	}
 
 	if p.ServiceName != nil {
-		whereConditions = append(whereConditions, squirrel.Eq{"sv.name": *p.ServiceName})
+		baseQuery = baseQuery.Where(squirrel.Eq{"sv.name": *p.ServiceName})
 	}
 
 	if p.StartDate != nil && p.EndDate != nil {
-		whereConditions = append(whereConditions, squirrel.LtOrEq{"s.start_date": *p.EndDate})
-		whereConditions = append(whereConditions, squirrel.Or{
+		baseQuery = baseQuery.Where(squirrel.LtOrEq{"s.start_date": *p.EndDate})
+		baseQuery = baseQuery.Where(squirrel.Or{
 			squirrel.Eq{"s.end_date": nil},
 			squirrel.GtOrEq{"s.end_date": *p.StartDate},
 		})
 	} else if p.StartDate != nil {
-		whereConditions = append(whereConditions, squirrel.Or{
+		baseQuery = baseQuery.Where(squirrel.Or{
 			squirrel.Eq{"s.end_date": nil},
 			squirrel.GtOrEq{"s.end_date": *p.StartDate},
 		})
 	} else if p.EndDate != nil {
-		whereConditions = append(whereConditions, squirrel.LtOrEq{"s.start_date": *p.EndDate})
-	}
-
-	if len(whereConditions) > 0 {
-		baseQuery = baseQuery.Where(whereConditions)
+		baseQuery = baseQuery.Where(squirrel.LtOrEq{"s.start_date": *p.EndDate})
 	}
 
 	query, args, err := baseQuery.

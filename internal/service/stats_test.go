@@ -252,6 +252,61 @@ func (s *StatsServiceSuite) TestFormatUUID_NilUUID() {
 	s.Nil(result)
 }
 
+func (s *StatsServiceSuite) TestGetTotalCost_WithFuturePeriod() {
+	userID := uuid.New()
+	serviceName := "Netflix"
+	now := time.Now()
+	currentMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
+	futureMonth := currentMonth.AddDate(0, 3, 0)
+	
+	startDate := currentMonth.AddDate(0, -2, 0)
+	endDate := futureMonth
+
+	subscriptions := []repository.SubscriptionCost{
+		{
+			ID:          1,
+			StartDate:   startDate,
+			EndDate:     &futureMonth,
+			PriceRub:    1000,
+			UserID:      userID,
+			ServiceName: serviceName,
+		},
+	}
+
+	repoStats := repository.TotalCostStats{
+		Subscriptions:      subscriptions,
+		UserID:             &userID,
+		ServiceName:        &serviceName,
+		StartDate:          &startDate,
+		EndDate:            &endDate,
+		SubscriptionsCount: 1,
+	}
+
+	expectedStats := repository.TotalCostStats{
+		TotalCost:          6000,
+		Subscriptions:      subscriptions,
+		UserID:             &userID,
+		ServiceName:        &serviceName,
+		StartDate:          &startDate,
+		EndDate:            &endDate,
+		SubscriptionsCount: 1,
+	}
+
+	s.statsRepo.EXPECT().
+		GetTotalCost(s.ctx, repository.GetTotalCostParams{
+			UserID:      &userID,
+			ServiceName: &serviceName,
+			StartDate:   &startDate,
+			EndDate:     &endDate,
+		}).
+		Return(repoStats, nil)
+
+	result, err := s.statsService.GetTotalCost(s.ctx, &userID, &serviceName, &startDate, &endDate)
+
+	s.NoError(err)
+	s.Equal(&expectedStats, result)
+}
+
 func timePtr(t time.Time) *time.Time {
 	return &t
 }
