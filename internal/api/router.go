@@ -6,7 +6,6 @@ import (
 	"EffectiveMobile/internal/repository"
 	"EffectiveMobile/internal/service"
 	"log/slog"
-	"net/http"
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
@@ -18,6 +17,7 @@ func NewRouter(log *slog.Logger, serviceRepo *repository.ServiceRepository, subs
 	router.Use(middleware.RequestID)
 	router.Use(middleware.Recoverer)
 	router.Use(middleware.URLFormat)
+
 	router.Use(logger.New(log))
 
 	subscriptionService := service.NewSubscriptionService(serviceRepo, subscriptionRepo, log)
@@ -28,11 +28,6 @@ func NewRouter(log *slog.Logger, serviceRepo *repository.ServiceRepository, subs
 			r.Mount("/", handlers.GetSubscriptionsRoutes(subscriptionService, statsService, log))
 		})
 		r.Mount("/stats", handlers.GetStatRoutes(statsService, log))
-	})
-
-	router.Route("/swagger", func(r chi.Router) {
-		fs := http.StripPrefix("/swagger/", http.FileServer(http.Dir(".static/swagger")))
-		r.Get("/*", fs.ServeHTTP)
 	})
 
 	return router
