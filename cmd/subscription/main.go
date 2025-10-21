@@ -5,9 +5,13 @@ import (
 	"EffectiveMobile/internal/config"
 	"EffectiveMobile/internal/repository"
 	"EffectiveMobile/pkg/postgres"
+	"context"
 	"log/slog"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 )
 
 const (
@@ -60,11 +64,34 @@ func main() {
 		IdleTimeout:  cfg.HTTPServer.IdleTimeout,
 	}
 
-	if err := srv.ListenAndServe(); err != nil {
-		log.Error("failed to start server", slog.String("err", err.Error()))
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Error("failed to start server", slog.String("err", err.Error()))
+			os.Exit(1)
+		}
+	}()
+
+	log.Info("server started successfully")
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
+	
+	sig := <-quit
+	log.Info("received shutdown signal", slog.String("signal", sig.String()))
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	log.Info("shutting down server...")
+	
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Error("server forced to shutdown", slog.String("err", err.Error()))
 	}
 
-	log.Info("stopping server", slog.String("env", cfg.Env))
+	log.Info("closing database connections...")
+	provider.Close()
+
+	log.Info("server stopped")
 }
 
 func setupLogger(env string) *slog.Logger {
