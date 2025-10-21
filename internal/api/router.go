@@ -10,8 +10,8 @@ import (
 
 	"time"
 
-	"github.com/go-chi/chi"
-	"github.com/go-chi/chi/middleware"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	httpSwagger "github.com/swaggo/http-swagger"
 )
 
@@ -25,6 +25,10 @@ func NewRouter(log *slog.Logger, serviceRepo *repository.ServiceRepository, subs
 
 	router.Use(logger.New(log))
 
+    router.Get("/health", func(w http.ResponseWriter, r *http.Request) {
+        w.WriteHeader(http.StatusOK)
+    })
+
 	subscriptionService := service.NewSubscriptionService(serviceRepo, subscriptionRepo, log)
 	statsService := service.NewStatsService(statsRepo, log)
 
@@ -35,10 +39,10 @@ func NewRouter(log *slog.Logger, serviceRepo *repository.ServiceRepository, subs
 		httpSwagger.URL("/static/swagger/swagger.json"),
 	))
 
-	router.Route("/api/v1", func(r chi.Router) {
-		r.Route("/subscriptions", func(r chi.Router) {
-			r.Mount("/", handlers.GetSubscriptionsRoutes(subscriptionService, statsService, log))
-		})
+    router.Route("/api/v1", func(r chi.Router) {
+        r.Route("/subscriptions", func(r chi.Router) {
+            r.Mount("/", handlers.GetSubscriptionsRoutes(subscriptionService, log))
+        })
 		r.Mount("/stats", handlers.GetStatRoutes(statsService, log))
 	})
 

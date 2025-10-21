@@ -130,7 +130,7 @@ func (s *SubscriptionServiceSuite) TestCreateSubscription_InvalidDate() {
 
 	s.Error(err)
 	s.Equal(int64(0), result)
-	s.Contains(err.Error(), "cannot parse")
+	s.Contains(err.Error(), "invalid date format")
 }
 
 func (s *SubscriptionServiceSuite) TestCreateSubscription_EndDateBeforeStartDate() {
@@ -192,13 +192,14 @@ func (s *SubscriptionServiceSuite) TestUpdateSubscription_Success() {
 	s.subscriptionRepo.EXPECT().
 		UpdateSubscription(s.ctx, repository.UpdateSubscriptionParams{
 			ID:        subscriptionID,
+			ServiceID: nil,
 			PriceRub:  &price,
 			StartDate: &[]time.Time{time.Date(2024, 2, 1, 0, 0, 0, 0, time.UTC)}[0],
 			EndDate:   &[]time.Time{time.Date(2024, 4, 1, 0, 0, 0, 0, time.UTC)}[0],
 		}).
 		Return(nil)
 
-	err := s.subscriptionService.UpdateSubscription(s.ctx, subscriptionID, &price, &startDate, &endDate)
+	err := s.subscriptionService.UpdateSubscription(s.ctx, subscriptionID, nil, &price, &startDate, &endDate)
 
 	s.NoError(err)
 }
@@ -212,16 +213,63 @@ func (s *SubscriptionServiceSuite) TestUpdateSubscription_NotFound() {
 	s.subscriptionRepo.EXPECT().
 		UpdateSubscription(s.ctx, repository.UpdateSubscriptionParams{
 			ID:        subscriptionID,
+			ServiceID: nil,
 			PriceRub:  &price,
 			StartDate: &[]time.Time{time.Date(2024, 2, 1, 0, 0, 0, 0, time.UTC)}[0],
 			EndDate:   nil,
 		}).
 		Return(notFoundError)
 
-	err := s.subscriptionService.UpdateSubscription(s.ctx, subscriptionID, &price, &startDate, nil)
+	err := s.subscriptionService.UpdateSubscription(s.ctx, subscriptionID, nil, &price, &startDate, nil)
 
 	s.Error(err)
 	s.Equal(notFoundError, err)
+}
+
+func (s *SubscriptionServiceSuite) TestUpdateSubscription_WithServiceName() {
+	subscriptionID := int64(123)
+	serviceName := "Spotify"
+	serviceID := 5
+	price := 700
+
+	s.serviceRepo.EXPECT().
+		GetOrCreateServiceID(s.ctx, serviceName).
+		Return(serviceID, nil)
+
+	s.subscriptionRepo.EXPECT().
+		UpdateSubscription(s.ctx, repository.UpdateSubscriptionParams{
+			ID:        subscriptionID,
+			ServiceID: &serviceID,
+			PriceRub:  &price,
+			StartDate: nil,
+			EndDate:   nil,
+		}).
+		Return(nil)
+
+	err := s.subscriptionService.UpdateSubscription(s.ctx, subscriptionID, &serviceName, &price, nil, nil)
+
+	s.NoError(err)
+}
+
+func (s *SubscriptionServiceSuite) TestUpdateSubscription_Conflict() {
+	subscriptionID := int64(123)
+	startDate := "02-2024"
+	conflictError := repository.ErrSubscriptionAlreadyExists
+
+	s.subscriptionRepo.EXPECT().
+		UpdateSubscription(s.ctx, repository.UpdateSubscriptionParams{
+			ID:        subscriptionID,
+			ServiceID: nil,
+			PriceRub:  nil,
+			StartDate: &[]time.Time{time.Date(2024, 2, 1, 0, 0, 0, 0, time.UTC)}[0],
+			EndDate:   nil,
+		}).
+		Return(conflictError)
+
+	err := s.subscriptionService.UpdateSubscription(s.ctx, subscriptionID, nil, nil, &startDate, nil)
+
+	s.Error(err)
+	s.Equal(conflictError, err)
 }
 
 func (s *SubscriptionServiceSuite) TestDeleteSubscription_Success() {

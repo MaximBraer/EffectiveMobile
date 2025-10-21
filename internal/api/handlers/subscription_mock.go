@@ -13,7 +13,6 @@ import (
 	repository "EffectiveMobile/internal/repository"
 	context "context"
 	reflect "reflect"
-	time "time"
 
 	uuid "github.com/google/uuid"
 	gomock "go.uber.org/mock/gomock"
@@ -103,31 +102,16 @@ func (mr *MockSubscriptionServiceMockRecorder) ListSubscriptions(ctx, params any
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListSubscriptions", reflect.TypeOf((*MockSubscriptionService)(nil).ListSubscriptions), ctx, params)
 }
 
-// ParseMonth mocks base method.
-func (m *MockSubscriptionService) ParseMonth(s string) (time.Time, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ParseMonth", s)
-	ret0, _ := ret[0].(time.Time)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ParseMonth indicates an expected call of ParseMonth.
-func (mr *MockSubscriptionServiceMockRecorder) ParseMonth(s any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ParseMonth", reflect.TypeOf((*MockSubscriptionService)(nil).ParseMonth), s)
-}
-
 // UpdateSubscription mocks base method.
-func (m *MockSubscriptionService) UpdateSubscription(ctx context.Context, id int64, price *int, startDate, endDate *string) error {
+func (m *MockSubscriptionService) UpdateSubscription(ctx context.Context, id int64, serviceName *string, price *int, startDate, endDate *string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpdateSubscription", ctx, id, price, startDate, endDate)
+	ret := m.ctrl.Call(m, "UpdateSubscription", ctx, id, serviceName, price, startDate, endDate)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // UpdateSubscription indicates an expected call of UpdateSubscription.
-func (mr *MockSubscriptionServiceMockRecorder) UpdateSubscription(ctx, id, price, startDate, endDate any) *gomock.Call {
+func (mr *MockSubscriptionServiceMockRecorder) UpdateSubscription(ctx, id, serviceName, price, startDate, endDate any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateSubscription", reflect.TypeOf((*MockSubscriptionService)(nil).UpdateSubscription), ctx, id, price, startDate, endDate)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateSubscription", reflect.TypeOf((*MockSubscriptionService)(nil).UpdateSubscription), ctx, id, serviceName, price, startDate, endDate)
 }

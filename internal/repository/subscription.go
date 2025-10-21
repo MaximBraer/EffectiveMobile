@@ -30,6 +30,7 @@ type CreateSubscriptionParams struct {
 
 type UpdateSubscriptionParams struct {
 	ID        int64
+	ServiceID *int
 	PriceRub  *int
 	StartDate *time.Time
 	EndDate   *time.Time
@@ -117,6 +118,10 @@ func (r *SubscriptionRepository) GetSubscription(ctx context.Context, id int64) 
 func (r *SubscriptionRepository) UpdateSubscription(ctx context.Context, p UpdateSubscriptionParams) error {
 	queryBuilder := squirrel.Update("subscription")
 
+	if p.ServiceID != nil {
+		queryBuilder = queryBuilder.Set("service_id", *p.ServiceID)
+	}
+
 	if p.PriceRub != nil {
 		queryBuilder = queryBuilder.Set("price_rub", *p.PriceRub)
 	}
@@ -142,6 +147,10 @@ func (r *SubscriptionRepository) UpdateSubscription(ctx context.Context, p Updat
 
 	result, err := r.provider.GetConn().ExecContext(ctx, query, args...)
 	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
+			return ErrSubscriptionAlreadyExists
+		}
 		return fmt.Errorf("failed to execute query: %w", err)
 	}
 

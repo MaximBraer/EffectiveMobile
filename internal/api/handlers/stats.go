@@ -8,12 +8,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"errors"
 	"log/slog"
 	"net/http"
 	"time"
 
-	"github.com/go-chi/chi"
-	"github.com/go-chi/chi/middleware"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/google/uuid"
 )
 
@@ -22,6 +23,8 @@ const (
 	ErrInvalidUserID        = "invalid user_id format"
 	ErrInternalServerStats  = "internal server error"
 )
+
+var ErrValidation = errors.New("validation error")
 
 type StatsService interface {
 	GetTotalCost(ctx context.Context, userID *uuid.UUID, serviceName *string, startDate, endDate *time.Time) (*repository.TotalCostStats, error)
@@ -64,7 +67,7 @@ func validateStatsParams(req GetTotalStatsRequest, statsService StatsService) (*
 	if req.UserID != nil {
 		id, err := uuid.Parse(*req.UserID)
 		if err != nil {
-			return nil, fmt.Errorf(ErrInvalidUserID)
+			return nil, fmt.Errorf("%w: %s", ErrValidation, ErrInvalidUserID)
 		}
 		params.UserID = &id
 	}
@@ -76,7 +79,7 @@ func validateStatsParams(req GetTotalStatsRequest, statsService StatsService) (*
 	if req.StartDate != nil {
 		date, err := statsService.ParseMonth(*req.StartDate)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("%w: %s", ErrValidation, err.Error())
 		}
 		params.StartDate = &date
 	}
@@ -84,13 +87,13 @@ func validateStatsParams(req GetTotalStatsRequest, statsService StatsService) (*
 	if req.EndDate != nil {
 		date, err := statsService.ParseMonth(*req.EndDate)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("%w: %s", ErrValidation, err.Error())
 		}
 		params.EndDate = &date
 	}
 
 	if params.StartDate != nil && params.EndDate != nil && params.EndDate.Before(*params.StartDate) {
-		return nil, fmt.Errorf("end date must be after start date")
+		return nil, fmt.Errorf("%w: end date must be after start date", ErrValidation)
 	}
 
 	return params, nil
@@ -106,16 +109,21 @@ type Filters struct {
 	ServiceName *string `json:"service_name,omitempty"`
 }
 
+type ErrorResponse struct {
+	Error string `json:"error" example:"invalid arguments"`
+}
+
 // @Summary      Get total stats
+// @Description  Calculate total cost of subscriptions for the period. Date format: MM-YYYY (e.g., "01-2024", "12-2024")
 // @Tags         stats
 // @Produce      json
-// @Param        user_id       query     string  false  "user uuid"
-// @Param        service_name  query     string  false  "service name"
-// @Param        start_date    query     string  false  "MM-YYYY"
-// @Param        end_date      query     string  false  "MM-YYYY"
+// @Param        user_id       query     string  false  "User UUID"                    example(550e8400-e29b-41d4-a716-446655440000)
+// @Param        service_name  query     string  false  "Service name"                 example(Netflix)
+// @Param        start_date    query     string  false  "Period start (MM-YYYY)"       example(01-2024)
+// @Param        end_date      query     string  false  "Period end (MM-YYYY)"         example(12-2024)
 // @Success      200           {object}  GetTotalStatsResponse
-// @Failure      400           {object}  map[string]string
-// @Failure      500           {object}  map[string]string
+// @Failure      400           {object}  ErrorResponse  "Invalid arguments or date format"
+// @Failure      500           {object}  ErrorResponse  "Internal server error"
 // @Router       /stats/total [get]
 func GetTotalStats(statsService StatsService, log *slog.Logger) http.HandlerFunc {
 	const op = "handlers.api.stats.GetTotalStats"

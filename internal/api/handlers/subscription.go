@@ -4,6 +4,7 @@ package handlers
 
 import (
 	"EffectiveMobile/internal/repository"
+	serv "EffectiveMobile/internal/service"
 	"EffectiveMobile/pkg/api/response"
 	"context"
 	"encoding/json"
@@ -14,8 +15,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/go-chi/chi"
-	"github.com/go-chi/chi/middleware"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/render"
 	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
@@ -33,7 +34,7 @@ const (
 type SubscriptionService interface {
 	CreateSubscription(ctx context.Context, serviceName string, price int, userID uuid.UUID, startDate, endDate string) (int64, error)
 	GetSubscription(ctx context.Context, id int64) (*repository.Subscription, error)
-	UpdateSubscription(ctx context.Context, id int64, price *int, startDate, endDate *string) error
+	UpdateSubscription(ctx context.Context, id int64, serviceName *string, price *int, startDate, endDate *string) error
 	DeleteSubscription(ctx context.Context, id int64) error
 	ListSubscriptions(ctx context.Context, params repository.ListSubscriptionsParams) ([]repository.Subscription, int, error)
 }
@@ -57,9 +58,10 @@ type CreateSubscriptionResponse struct {
 }
 
 type UpdateSubscriptionRequest struct {
-	Price     *int    `json:"price,omitempty" validate:"omitempty,min=0"`
-	StartDate *string `json:"start_date,omitempty"`
-	EndDate   *string `json:"end_date,omitempty"`
+	ServiceName *string `json:"service_name,omitempty"`
+	Price       *int    `json:"price,omitempty" validate:"omitempty,min=0"`
+	StartDate   *string `json:"start_date,omitempty"`
+	EndDate     *string `json:"end_date,omitempty"`
 }
 
 func validateUpdateSubscriptionRequest(req UpdateSubscriptionRequest) error {
@@ -68,7 +70,7 @@ func validateUpdateSubscriptionRequest(req UpdateSubscriptionRequest) error {
 		return err
 	}
 	
-	if req.Price == nil && req.StartDate == nil && req.EndDate == nil {
+	if req.ServiceName == nil && req.Price == nil && req.StartDate == nil && req.EndDate == nil {
 		return fmt.Errorf("at least one field must be provided")
 	}
 	
@@ -85,16 +87,17 @@ type GetSubscriptionResponse struct {
 }
 
 // @Summary      Create subscription
+// @Description  Create a new subscription. Date format: MM-YYYY (e.g., "01-2024")
 // @Tags         subscriptions
 // @Accept       json
 // @Produce      json
 // @Param        input  body      CreateSubscriptionRequest  true  "Create payload"
 // @Success      201    {object}  CreateSubscriptionResponse
-// @Failure      400    {object}  map[string]string
-// @Failure      409    {object}  map[string]string
-// @Failure      500    {object}  map[string]string
+// @Failure      400    {object}  ErrorResponse  "Invalid request body or validation error"
+// @Failure      409    {object}  ErrorResponse  "Subscription already exists"
+// @Failure      500    {object}  ErrorResponse  "Internal server error"
 // @Router       /subscriptions [post]
-func SaveSubscription(subscriptionService SubscriptionService, statsService StatsService, log *slog.Logger) http.HandlerFunc {
+func SaveSubscription(subscriptionService SubscriptionService, log *slog.Logger) http.HandlerFunc {
 	const op = "handlers.api.subscription.SaveSubscription"
 	log = log.With(slog.String("op", op))
 
@@ -123,8 +126,12 @@ func SaveSubscription(subscriptionService SubscriptionService, statsService Stat
 		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 		defer cancel()
 
-		id, err := subscriptionService.CreateSubscription(ctx, req.ServiceName, req.Price, req.UserID, req.StartDate, endDate)
+        id, err := subscriptionService.CreateSubscription(ctx, req.ServiceName, req.Price, req.UserID, req.StartDate, endDate)
 		if err != nil {
+            if errors.Is(err, serv.ErrValidation) {
+                response.WriteError(w, http.StatusBadRequest, ErrInvalidArguments)
+                return
+            }
 			if errors.Is(err, repository.ErrSubscriptionAlreadyExists) {
 				response.WriteError(w, http.StatusConflict, ErrSubscriptionExists)
 				return
@@ -134,7 +141,7 @@ func SaveSubscription(subscriptionService SubscriptionService, statsService Stat
 			return
 		}
 
-		w.Header().Set("Location", "/subscriptions/"+strconv.FormatInt(id, 10))
+        w.Header().Set("Location", "/api/v1/subscriptions/"+strconv.FormatInt(id, 10))
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		_ = json.NewEncoder(w).Encode(CreateSubscriptionResponse{
@@ -149,11 +156,11 @@ func SaveSubscription(subscriptionService SubscriptionService, statsService Stat
 // @Produce      json
 // @Param        id   path      int  true  "Subscription ID"
 // @Success      200  {object}  GetSubscriptionResponse
-// @Failure      400  {object}  map[string]string
-// @Failure      404  {object}  map[string]string
-// @Failure      500  {object}  map[string]string
+// @Failure      400  {object}  ErrorResponse  "Invalid subscription ID"
+// @Failure      404  {object}  ErrorResponse  "Subscription not found"
+// @Failure      500  {object}  ErrorResponse  "Internal server error"
 // @Router       /subscriptions/{id} [get]
-func GetSubscription(subscriptionService SubscriptionService, statsService StatsService, log *slog.Logger) http.HandlerFunc {
+func GetSubscription(subscriptionService SubscriptionService, log *slog.Logger) http.HandlerFunc {
 	const op = "handlers.api.subscription.GetSubscription"
 	log = log.With(slog.String("op", op))
 
@@ -202,18 +209,19 @@ func GetSubscription(subscriptionService SubscriptionService, statsService Stats
 }
 
 // @Summary      Update subscription
+// @Description  Update subscription fields (partial update). Date format: MM-YYYY (e.g., "12-2024"). Can change service_name, price, start_date, and end_date.
 // @Tags         subscriptions
 // @Accept       json
 // @Produce      json
 // @Param        id     path      int                       true  "Subscription ID"
 // @Param        input  body      UpdateSubscriptionRequest  true  "Update payload"
-// @Success      200    {object}  map[string]string
-// @Failure      400    {object}  map[string]string
-// @Failure      404    {object}  map[string]string
-// @Failure      409    {object}  map[string]string
-// @Failure      500    {object}  map[string]string
+// @Success      200    {object}  map[string]string          "Successfully updated"
+// @Failure      400    {object}  ErrorResponse              "Invalid request body or validation error"
+// @Failure      404    {object}  ErrorResponse              "Subscription not found"
+// @Failure      409    {object}  ErrorResponse              "Conflict - duplicate subscription (user_id + service_id + start_date)"
+// @Failure      500    {object}  ErrorResponse              "Internal server error"
 // @Router       /subscriptions/{id} [put]
-func UpdateSubscription(subscriptionService SubscriptionService, statsService StatsService, log *slog.Logger) http.HandlerFunc {
+func UpdateSubscription(subscriptionService SubscriptionService, log *slog.Logger) http.HandlerFunc {
 	const op = "handlers.api.subscription.UpdateSubscription"
 	log = log.With(slog.String("op", op))
 
@@ -244,8 +252,12 @@ func UpdateSubscription(subscriptionService SubscriptionService, statsService St
 		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 		defer cancel()
 
-		err = subscriptionService.UpdateSubscription(ctx, id, req.Price, req.StartDate, req.EndDate)
+        err = subscriptionService.UpdateSubscription(ctx, id, req.ServiceName, req.Price, req.StartDate, req.EndDate)
 		if err != nil {
+            if errors.Is(err, serv.ErrValidation) {
+                response.WriteError(w, http.StatusBadRequest, ErrInvalidArguments)
+                return
+            }
 			if errors.Is(err, repository.ErrSubscriptionNotFound) {
 				response.WriteError(w, http.StatusNotFound, ErrSubscriptionNotFound)
 				return
@@ -270,11 +282,11 @@ func UpdateSubscription(subscriptionService SubscriptionService, statsService St
 // @Tags         subscriptions
 // @Param        id   path  int  true  "Subscription ID"
 // @Success      204  {string}  string  "No content"
-// @Failure      400  {object}  map[string]string
-// @Failure      404  {object}  map[string]string
-// @Failure      500  {object}  map[string]string
+// @Failure      400  {object}  ErrorResponse  "Invalid subscription ID"
+// @Failure      404  {object}  ErrorResponse  "Subscription not found"
+// @Failure      500  {object}  ErrorResponse  "Internal server error"
 // @Router       /subscriptions/{id} [delete]
-func DeleteSubscription(subscriptionService SubscriptionService, statsService StatsService, log *slog.Logger) http.HandlerFunc {
+func DeleteSubscription(subscriptionService SubscriptionService, log *slog.Logger) http.HandlerFunc {
 	const op = "handlers.api.subscription.DeleteSubscription"
 	log = log.With(slog.String("op", op))
 
@@ -315,10 +327,11 @@ func DeleteSubscription(subscriptionService SubscriptionService, statsService St
 // @Param        offset        query     int     false  "offset"  minimum(0)  default(0)
 // @Param        user_id       query     string  false  "user uuid"
 // @Param        service_name  query     string  false  "service name"
-// @Success      200           {object}  map[string]interface{}
-// @Failure      500           {object}  map[string]string
+// @Success      200           {object}  map[string]interface{}  "List of subscriptions with pagination"
+// @Failure      400           {object}  ErrorResponse           "Invalid user_id format"
+// @Failure      500           {object}  ErrorResponse           "Internal server error"
 // @Router       /subscriptions [get]
-func ListSubscriptions(subscriptionService SubscriptionService, statsService StatsService, log *slog.Logger) http.HandlerFunc {
+func ListSubscriptions(subscriptionService SubscriptionService, log *slog.Logger) http.HandlerFunc {
 	const op = "handlers.api.subscription.ListSubscriptions"
 	log = log.With(slog.String("op", op))
 
@@ -375,12 +388,37 @@ func ListSubscriptions(subscriptionService SubscriptionService, statsService Sta
 			return
 		}
 
-		result := map[string]interface{}{
-			"subscriptions": subscriptions,
-			"total":         total,
-			"limit":         limit,
-			"offset":        offset,
-		}
+        type listItem struct {
+            ID          int64   `json:"id"`
+            ServiceName string  `json:"service_name"`
+            Price       int     `json:"price"`
+            UserID      string  `json:"user_id"`
+            StartDate   string  `json:"start_date"`
+            EndDate     *string `json:"end_date,omitempty"`
+        }
+
+        items := make([]listItem, 0, len(subscriptions))
+        for _, s := range subscriptions {
+            item := listItem{
+                ID:          s.ID,
+                ServiceName: s.ServiceName,
+                Price:       s.Price,
+                UserID:      s.UserID.String(),
+                StartDate:   s.StartDate.Format("01-2006"),
+            }
+            if s.EndDate != nil {
+                ed := s.EndDate.Format("01-2006")
+                item.EndDate = &ed
+            }
+            items = append(items, item)
+        }
+
+        result := map[string]interface{}{
+            "subscriptions": items,
+            "total":         total,
+            "limit":         limit,
+            "offset":        offset,
+        }
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
@@ -388,12 +426,12 @@ func ListSubscriptions(subscriptionService SubscriptionService, statsService Sta
 	}
 }
 
-func GetSubscriptionsRoutes(subscriptionService SubscriptionService, statsService StatsService, log *slog.Logger) chi.Router {
+func GetSubscriptionsRoutes(subscriptionService SubscriptionService, log *slog.Logger) chi.Router {
 	r := chi.NewRouter()
-	r.Post("/", SaveSubscription(subscriptionService, statsService, log))
-	r.Get("/", ListSubscriptions(subscriptionService, statsService, log))
-	r.Get("/{id}", GetSubscription(subscriptionService, statsService, log))
-	r.Put("/{id}", UpdateSubscription(subscriptionService, statsService, log))
-	r.Delete("/{id}", DeleteSubscription(subscriptionService, statsService, log))
+	r.Post("/", SaveSubscription(subscriptionService, log))
+	r.Get("/", ListSubscriptions(subscriptionService, log))
+	r.Get("/{id}", GetSubscription(subscriptionService, log))
+	r.Put("/{id}", UpdateSubscription(subscriptionService, log))
+	r.Delete("/{id}", DeleteSubscription(subscriptionService, log))
 	return r
 }

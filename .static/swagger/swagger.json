@@ -14,6 +14,7 @@
     "paths": {
         "/stats/total": {
             "get": {
+                "description": "Calculate total cost of subscriptions for the period. Date format: MM-YYYY (e.g., \"01-2024\", \"12-2024\")",
                 "produces": [
                     "application/json"
                 ],
@@ -24,25 +25,29 @@
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "user uuid",
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "description": "User UUID",
                         "name": "user_id",
                         "in": "query"
                     },
                     {
                         "type": "string",
-                        "description": "service name",
+                        "example": "Netflix",
+                        "description": "Service name",
                         "name": "service_name",
                         "in": "query"
                     },
                     {
                         "type": "string",
-                        "description": "MM-YYYY",
+                        "example": "01-2024",
+                        "description": "Period start (MM-YYYY)",
                         "name": "start_date",
                         "in": "query"
                     },
                     {
                         "type": "string",
-                        "description": "MM-YYYY",
+                        "example": "12-2024",
+                        "description": "Period end (MM-YYYY)",
                         "name": "end_date",
                         "in": "query"
                     }
@@ -55,21 +60,15 @@
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Invalid arguments or date format",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "500": {
-                        "description": "Internal Server Error",
+                        "description": "Internal server error",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     }
                 }
@@ -116,24 +115,28 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "List of subscriptions with pagination",
                         "schema": {
                             "type": "object",
                             "additionalProperties": true
                         }
                     },
-                    "500": {
-                        "description": "Internal Server Error",
+                    "400": {
+                        "description": "Invalid user_id format",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     }
                 }
             },
             "post": {
+                "description": "Create a new subscription. Date format: MM-YYYY (e.g., \"01-2024\")",
                 "consumes": [
                     "application/json"
                 ],
@@ -163,30 +166,21 @@
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Invalid request body or validation error",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "409": {
-                        "description": "Conflict",
+                        "description": "Subscription already exists",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "500": {
-                        "description": "Internal Server Error",
+                        "description": "Internal server error",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     }
                 }
@@ -218,35 +212,27 @@
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Invalid subscription ID",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "404": {
-                        "description": "Not Found",
+                        "description": "Subscription not found",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "500": {
-                        "description": "Internal Server Error",
+                        "description": "Internal server error",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     }
                 }
             },
             "put": {
+                "description": "Update subscription fields (partial update). Date format: MM-YYYY (e.g., \"12-2024\"). Can change service_name, price, start_date, and end_date.",
                 "consumes": [
                     "application/json"
                 ],
@@ -277,7 +263,7 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Successfully updated",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -286,39 +272,27 @@
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Invalid request body or validation error",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "404": {
-                        "description": "Not Found",
+                        "description": "Subscription not found",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "409": {
-                        "description": "Conflict",
+                        "description": "Conflict - duplicate subscription (user_id + service_id + start_date)",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "500": {
-                        "description": "Internal Server Error",
+                        "description": "Internal server error",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     }
                 }
@@ -345,30 +319,21 @@
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Invalid subscription ID",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "404": {
-                        "description": "Not Found",
+                        "description": "Subscription not found",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "500": {
-                        "description": "Internal Server Error",
+                        "description": "Internal server error",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     }
                 }
@@ -411,6 +376,15 @@
                 },
                 "status": {
                     "type": "string"
+                }
+            }
+        },
+        "handlers.ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string",
+                    "example": "invalid arguments"
                 }
             }
         },
@@ -485,6 +459,9 @@
                 "price": {
                     "type": "integer",
                     "minimum": 0
+                },
+                "service_name": {
+                    "type": "string"
                 },
                 "start_date": {
                     "type": "string"

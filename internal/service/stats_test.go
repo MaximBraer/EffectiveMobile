@@ -209,7 +209,7 @@ func (s *StatsServiceSuite) TestParseMonth_InvalidFormat() {
 
 	s.Error(err)
 	s.Zero(result)
-	s.Contains(err.Error(), "cannot parse")
+	s.Contains(err.Error(), "invalid date format")
 }
 
 func (s *StatsServiceSuite) TestParseMonth_InvalidMonth() {
@@ -219,12 +219,12 @@ func (s *StatsServiceSuite) TestParseMonth_InvalidMonth() {
 
 	s.Error(err)
 	s.Zero(result)
-	s.Contains(err.Error(), "month out of range")
+	s.Contains(err.Error(), "invalid date format")
 }
 
 func (s *StatsServiceSuite) TestFormatDate_Success() {
 	date := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
-	expected := "2024-01-01"
+	expected := "01-2024"
 
 	result := s.statsService.FormatDate(&date)
 

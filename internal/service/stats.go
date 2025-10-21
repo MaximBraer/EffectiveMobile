@@ -5,6 +5,7 @@ package service
 import (
 	"EffectiveMobile/internal/repository"
 	"context"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -51,7 +52,7 @@ func (s *StatsService) GetTotalCost(ctx context.Context, userID *uuid.UUID, serv
 func (s *StatsService) ParseMonth(monthStr string) (time.Time, error) {
 	t, err := time.Parse("01-2006", monthStr)
 	if err != nil {
-		return time.Time{}, err
+		return time.Time{}, fmt.Errorf("invalid date format, expected MM-YYYY (e.g., 01-2024), got: %s", monthStr)
 	}
 	return time.Date(t.Year(), t.Month(), 1, 0, 0, 0, 0, time.UTC), nil
 }
@@ -60,7 +61,7 @@ func (s *StatsService) FormatDate(date *time.Time) string {
 	if date == nil {
 		return ""
 	}
-	return date.Format("2006-01-02")
+	return date.Format("01-2006")
 }
 
 func (s *StatsService) FormatUUID(uuid *uuid.UUID) *string {

@@ -31,7 +31,7 @@ func New(user, pass string, sqlDataBase SQLDataBase, logger Logger) *Provider {
 		sqlDataBase.Database,
 	)
 
-	logger.Info("postgres connection string", "dsn", info)
+	logger.Info("postgres connection", "user", user, "host", sqlDataBase.Server, "port", sqlDataBase.Port, "db", sqlDataBase.Database)
 
 	return &Provider{
 		cs:        info,

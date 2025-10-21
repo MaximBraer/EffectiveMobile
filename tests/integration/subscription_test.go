@@ -209,17 +209,17 @@ func (s *SubscriptionSuite) TestListSubscriptions() {
 	s.NoError(err)
 	s.Equal(200, resp.StatusCode)
 
-	var response struct {
-		Subscriptions []struct {
-			ID          int64      `json:"ID"`
-			ServiceName string     `json:"ServiceName"`
-			Price       int        `json:"Price"`
-			UserID      uuid.UUID  `json:"UserID"`
-			StartDate   time.Time  `json:"StartDate"`
-			EndDate     *time.Time `json:"EndDate"`
-		} `json:"subscriptions"`
-		Total int `json:"total"`
-	}
+    var response struct {
+        Subscriptions []struct {
+            ID          int64   `json:"id"`
+            ServiceName string  `json:"service_name"`
+            Price       int     `json:"price"`
+            UserID      string  `json:"user_id"`
+            StartDate   string  `json:"start_date"`
+            EndDate     *string `json:"end_date,omitempty"`
+        } `json:"subscriptions"`
+        Total int `json:"total"`
+    }
 	err = jsoniter.Unmarshal(respBody, &response)
 	s.NoError(err)
 
@@ -227,10 +227,12 @@ func (s *SubscriptionSuite) TestListSubscriptions() {
 	s.Equal(2, response.Total)
 
 	s.Require().GreaterOrEqual(len(response.Subscriptions), 2)
-	s.Equal("Netflix", response.Subscriptions[0].ServiceName)
-	s.Equal(500, response.Subscriptions[0].Price)
-	s.Equal("Spotify", response.Subscriptions[1].ServiceName)
-	s.Equal(300, response.Subscriptions[1].Price)
+    s.Equal("Netflix", response.Subscriptions[0].ServiceName)
+    s.Equal(500, response.Subscriptions[0].Price)
+    s.Equal("01-2024", response.Subscriptions[0].StartDate)
+    s.Equal("Spotify", response.Subscriptions[1].ServiceName)
+    s.Equal(300, response.Subscriptions[1].Price)
+    s.Equal("02-2024", response.Subscriptions[1].StartDate)
 }
 
 func (s *SubscriptionSuite) TestGetTotalStats() {

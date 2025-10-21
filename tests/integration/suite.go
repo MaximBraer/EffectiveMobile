@@ -21,8 +21,8 @@ func (s *Suite) waitForServiceReady(host string) {
 		eventTick    = 100 * time.Millisecond
 	)
 
-	s.Eventually(func() bool {
-		_, _, err := doRequest(http.MethodGet, host, "/readiness", nil, nil, nil) //nolint:bodyclose
+    s.Eventually(func() bool {
+        _, _, err := doRequest(http.MethodGet, host, "/health", nil, nil, nil) //nolint:bodyclose
 
 		return err == nil
 	}, eventTimeout, eventTick)
