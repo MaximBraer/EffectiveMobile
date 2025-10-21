@@ -6,3 +6,6 @@ CREATE INDEX IF NOT EXISTS idx_sub_service
 
 CREATE INDEX IF NOT EXISTS idx_sub_start_end
     ON subscription(start_date, end_date);
+
+CREATE INDEX IF NOT EXISTS idx_service_name
+    ON service(name);

@@ -251,7 +251,7 @@ func (s *SubscriptionSuite) TestGetTotalStats() {
 	err = jsoniter.Unmarshal(respBody, &stats)
 	s.NoError(err)
 
-	s.Equal(800, stats.TotalCost)
+	s.Equal(9300, stats.TotalCost)
 	s.Equal(2, stats.SubscriptionsCount)
 }
 

@@ -126,7 +126,11 @@ func (r *SubscriptionRepository) UpdateSubscription(ctx context.Context, p Updat
 	}
 
 	if p.EndDate != nil {
-		queryBuilder = queryBuilder.Set("end_date", *p.EndDate)
+		if p.EndDate.IsZero() {
+			queryBuilder = queryBuilder.Set("end_date", nil)
+		} else {
+			queryBuilder = queryBuilder.Set("end_date", *p.EndDate)
+		}
 	}
 
 	queryBuilder = queryBuilder.Where(squirrel.Eq{"id": p.ID})

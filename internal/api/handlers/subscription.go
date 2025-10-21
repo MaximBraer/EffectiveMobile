@@ -21,6 +21,15 @@ import (
 	"github.com/google/uuid"
 )
 
+const (
+	ErrInvalidArguments       = "invalid arguments"
+	ErrInvalidSubscriptionID  = "invalid subscription id"
+	ErrSubscriptionNotFound   = "subscription not found"
+	ErrSubscriptionExists     = "subscription already exists"
+	ErrInternalServer         = "internal server error"
+	ErrInvalidUserIDFormat    = "invalid user_id format"
+)
+
 type SubscriptionService interface {
 	CreateSubscription(ctx context.Context, serviceName string, price int, userID uuid.UUID, startDate, endDate string) (int64, error)
 	GetSubscription(ctx context.Context, id int64) (*repository.Subscription, error)
@@ -117,11 +126,11 @@ func SaveSubscription(subscriptionService SubscriptionService, statsService Stat
 		id, err := subscriptionService.CreateSubscription(ctx, req.ServiceName, req.Price, req.UserID, req.StartDate, endDate)
 		if err != nil {
 			if errors.Is(err, repository.ErrSubscriptionAlreadyExists) {
-				response.WriteError(w, http.StatusConflict, "subscription already exists")
+				response.WriteError(w, http.StatusConflict, ErrSubscriptionExists)
 				return
 			}
 			reqLog.Error("create subscription failed", slog.String("err", err.Error()))
-			response.WriteError(w, http.StatusInternalServerError, "internal server error")
+			response.WriteError(w, http.StatusInternalServerError, ErrInternalServer)
 			return
 		}
 
@@ -156,7 +165,7 @@ func GetSubscription(subscriptionService SubscriptionService, statsService Stats
 		idStr := chi.URLParam(r, "id")
 		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil || id <= 0 {
-			response.WriteError(w, http.StatusBadRequest, "invalid subscription id")
+			response.WriteError(w, http.StatusBadRequest, ErrInvalidSubscriptionID)
 			return
 		}
 
@@ -166,11 +175,11 @@ func GetSubscription(subscriptionService SubscriptionService, statsService Stats
 		subscription, err := subscriptionService.GetSubscription(ctx, id)
 		if err != nil {
 			if errors.Is(err, repository.ErrSubscriptionNotFound) {
-				response.WriteError(w, http.StatusNotFound, "subscription not found")
+				response.WriteError(w, http.StatusNotFound, ErrSubscriptionNotFound)
 				return
 			}
 			reqLog.Error("get subscription failed", slog.String("err", err.Error()))
-			response.WriteError(w, http.StatusInternalServerError, "internal server error")
+			response.WriteError(w, http.StatusInternalServerError, ErrInternalServer)
 			return
 		}
 
@@ -216,19 +225,19 @@ func UpdateSubscription(subscriptionService SubscriptionService, statsService St
 		idStr := chi.URLParam(r, "id")
 		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			response.WriteError(w, http.StatusBadRequest, "invalid subscription id")
+			response.WriteError(w, http.StatusBadRequest, ErrInvalidSubscriptionID)
 			return
 		}
 
 		var req UpdateSubscriptionRequest
 		if err := render.DecodeJSON(r.Body, &req); err != nil {
 			reqLog.Error("failed to decode request", slog.String("err", err.Error()))
-			response.WriteError(w, http.StatusBadRequest, "invalid arguments")
+			response.WriteError(w, http.StatusBadRequest, ErrInvalidArguments)
 			return
 		}
 
 		if err := validateUpdateSubscriptionRequest(req); err != nil {
-			response.WriteError(w, http.StatusBadRequest, "invalid arguments")
+			response.WriteError(w, http.StatusBadRequest, ErrInvalidArguments)
 			return
 		}
 
@@ -238,15 +247,15 @@ func UpdateSubscription(subscriptionService SubscriptionService, statsService St
 		err = subscriptionService.UpdateSubscription(ctx, id, req.Price, req.StartDate, req.EndDate)
 		if err != nil {
 			if errors.Is(err, repository.ErrSubscriptionNotFound) {
-				response.WriteError(w, http.StatusNotFound, "subscription not found")
+				response.WriteError(w, http.StatusNotFound, ErrSubscriptionNotFound)
 				return
 			}
 			if errors.Is(err, repository.ErrSubscriptionAlreadyExists) {
-				response.WriteError(w, http.StatusConflict, "subscription already exists")
+				response.WriteError(w, http.StatusConflict, ErrSubscriptionExists)
 				return
 			}
 			reqLog.Error("update subscription failed", slog.String("err", err.Error()))
-			response.WriteError(w, http.StatusInternalServerError, "internal server error")
+			response.WriteError(w, http.StatusInternalServerError, ErrInternalServer)
 			return
 		}
 
@@ -277,7 +286,7 @@ func DeleteSubscription(subscriptionService SubscriptionService, statsService St
 		idStr := chi.URLParam(r, "id")
 		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
-			response.WriteError(w, http.StatusBadRequest, "invalid subscription id")
+			response.WriteError(w, http.StatusBadRequest, ErrInvalidSubscriptionID)
 			return
 		}
 
@@ -287,11 +296,11 @@ func DeleteSubscription(subscriptionService SubscriptionService, statsService St
 		err = subscriptionService.DeleteSubscription(ctx, id)
 		if err != nil {
 			if errors.Is(err, repository.ErrSubscriptionNotFound) {
-				response.WriteError(w, http.StatusNotFound, "subscription not found")
+				response.WriteError(w, http.StatusNotFound, ErrSubscriptionNotFound)
 				return
 			}
 			reqLog.Error("delete subscription failed", slog.String("err", err.Error()))
-			response.WriteError(w, http.StatusInternalServerError, "internal server error")
+			response.WriteError(w, http.StatusInternalServerError, ErrInternalServer)
 			return
 		}
 
@@ -340,9 +349,12 @@ func ListSubscriptions(subscriptionService SubscriptionService, statsService Sta
 
 		var userID *uuid.UUID
 		if userIDStr != "" {
-			if id, err := uuid.Parse(userIDStr); err == nil {
-				userID = &id
+			id, err := uuid.Parse(userIDStr)
+			if err != nil {
+				response.WriteError(w, http.StatusBadRequest, ErrInvalidUserIDFormat)
+				return
 			}
+			userID = &id
 		}
 
 		var serviceNamePtr *string
@@ -359,7 +371,7 @@ func ListSubscriptions(subscriptionService SubscriptionService, statsService Sta
 
 		if err != nil {
 			reqLog.Error("list subscriptions failed", slog.String("err", err.Error()))
-			response.WriteError(w, http.StatusInternalServerError, "internal server error")
+			response.WriteError(w, http.StatusInternalServerError, ErrInternalServer)
 			return
 		}
 

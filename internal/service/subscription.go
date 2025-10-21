@@ -115,14 +115,18 @@ func (s *SubscriptionService) UpdateSubscription(ctx context.Context, id int64, 
 	}
 
 	if endDate != nil {
-		endDateParsed, err := s.ParseMonth(*endDate)
-		if err != nil {
-			return err
+		if *endDate == "" || *endDate == "null" {
+			updateParams.EndDate = &time.Time{}
+		} else {
+			endDateParsed, err := s.ParseMonth(*endDate)
+			if err != nil {
+				return err
+			}
+			if updateParams.StartDate != nil && endDateParsed.Before(*updateParams.StartDate) {
+				return fmt.Errorf("end date must be after start date")
+			}
+			updateParams.EndDate = &endDateParsed
 		}
-		if updateParams.StartDate != nil && endDateParsed.Before(*updateParams.StartDate) {
-			return fmt.Errorf("end date must be after start date")
-		}
-		updateParams.EndDate = &endDateParsed
 	}
 
 	err := s.subscriptionRepo.UpdateSubscription(ctx, updateParams)
@@ -152,14 +156,6 @@ func (s *SubscriptionService) ParseMonth(monthStr string) (time.Time, error) {
 		return time.Time{}, err
 	}
 	return time.Date(t.Year(), t.Month(), 1, 0, 0, 0, 0, time.UTC), nil
-}
-
-func formatEndDate(endDate *time.Time) *string {
-	if endDate == nil {
-		return nil
-	}
-	formatted := endDate.Format("01-2006")
-	return &formatted
 }
 
 func (s *SubscriptionService) ListSubscriptions(ctx context.Context, params repository.ListSubscriptionsParams) ([]repository.Subscription, int, error) {

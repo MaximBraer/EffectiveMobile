@@ -18,7 +18,9 @@ import (
 )
 
 const (
-	ErrInvalidArguments = "invalid arguments"
+	ErrInvalidStatsArguments = "invalid arguments"
+	ErrInvalidUserID        = "invalid user_id format"
+	ErrInternalServerStats  = "internal server error"
 )
 
 type StatsService interface {
@@ -62,7 +64,7 @@ func validateStatsParams(req GetTotalStatsRequest, statsService StatsService) (*
 	if req.UserID != nil {
 		id, err := uuid.Parse(*req.UserID)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf(ErrInvalidUserID)
 		}
 		params.UserID = &id
 	}
@@ -144,7 +146,7 @@ func GetTotalStats(statsService StatsService, log *slog.Logger) http.HandlerFunc
 
 		if err != nil {
 			reqLog.Error("get total cost failed", slog.String("err", err.Error()))
-			response.WriteError(w, http.StatusInternalServerError, "internal server error")
+			response.WriteError(w, http.StatusInternalServerError, ErrInternalServerStats)
 			return
 		}
 

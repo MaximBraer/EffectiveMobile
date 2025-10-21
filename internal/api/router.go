@@ -8,6 +8,8 @@ import (
 	"log/slog"
 	"net/http"
 
+	"time"
+
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
 	httpSwagger "github.com/swaggo/http-swagger"
@@ -19,6 +21,7 @@ func NewRouter(log *slog.Logger, serviceRepo *repository.ServiceRepository, subs
 	router.Use(middleware.RequestID)
 	router.Use(middleware.Recoverer)
 	router.Use(middleware.URLFormat)
+	router.Use(middleware.Timeout(10 * time.Second))
 
 	router.Use(logger.New(log))
 

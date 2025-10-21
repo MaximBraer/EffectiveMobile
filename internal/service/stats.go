@@ -110,9 +110,11 @@ func (s *StatsService) calculateIntersectionMonths(
 
 	if subscriptionEnd == nil {
 		if periodEnd == nil {
-			return 1
+			now := time.Now()
+			intersectionEnd = time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
+		} else {
+			intersectionEnd = *periodEnd
 		}
-		intersectionEnd = *periodEnd
 	} else {
 		if periodEnd == nil {
 			intersectionEnd = *subscriptionEnd
