@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"EffectiveMobile/internal/repository"
+
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/mock/gomock"
@@ -17,12 +18,12 @@ import (
 type SubscriptionServiceSuite struct {
 	suite.Suite
 
-	ctrl              *gomock.Controller
-	serviceRepo       *MockServicesRepository
-	subscriptionRepo  *MockSubscriptionRepository
+	ctrl                *gomock.Controller
+	serviceRepo         *MockServicesRepository
+	subscriptionRepo    *MockSubscriptionRepository
 	subscriptionService *SubscriptionService
-	logger            *slog.Logger
-	ctx               context.Context
+	logger              *slog.Logger
+	ctx                 context.Context
 }
 
 func TestSubscriptionService(t *testing.T) {
@@ -33,10 +34,10 @@ func (s *SubscriptionServiceSuite) SetupTest() {
 	s.ctrl = gomock.NewController(s.T())
 	s.serviceRepo = NewMockServicesRepository(s.ctrl)
 	s.subscriptionRepo = NewMockSubscriptionRepository(s.ctrl)
-	
+
 	s.logger = slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	s.ctx = context.Background()
-	
+
 	s.subscriptionService = NewSubscriptionService(s.serviceRepo, s.subscriptionRepo, s.logger)
 }
 

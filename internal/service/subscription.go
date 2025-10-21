@@ -136,7 +136,7 @@ func (s *SubscriptionService) UpdateSubscription(ctx context.Context, id int64, 
 			return err
 		}
 		if endDateParsed.Before(*updateParams.StartDate) {
-			return err
+			return fmt.Errorf("end date must be after start date")
 		}
 		updateParams.EndDate = &endDateParsed
 	} else {

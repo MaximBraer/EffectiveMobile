@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"EffectiveMobile/internal/repository"
+
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/mock/gomock"
@@ -19,11 +20,11 @@ import (
 type StatsHandlersSuite struct {
 	suite.Suite
 
-	ctrl         *gomock.Controller
+	ctrl                *gomock.Controller
 	subscriptionService *MockSubscriptionService
-	statsService *MockStatsService
-	logger       *slog.Logger
-	ctx          context.Context
+	statsService        *MockStatsService
+	logger              *slog.Logger
+	ctx                 context.Context
 }
 
 func TestStatsHandlers(t *testing.T) {
@@ -34,7 +35,7 @@ func (s *StatsHandlersSuite) SetupTest() {
 	s.ctrl = gomock.NewController(s.T())
 	s.subscriptionService = NewMockSubscriptionService(s.ctrl)
 	s.statsService = NewMockStatsService(s.ctrl)
-	
+
 	s.logger = slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	s.ctx = context.Background()
 }
@@ -69,13 +70,13 @@ func (s *StatsHandlersSuite) TestGetTotalStats_Success() {
 	}
 
 	expectedStats := &repository.TotalCostStats{
-		TotalCost:           2600,
-		Subscriptions:       subscriptions,
-		UserID:              &userID,
-		ServiceName:         &serviceName,
-		StartDate:           &startDate,
-		EndDate:             &endDate,
-		SubscriptionsCount:  2,
+		TotalCost:          2600,
+		Subscriptions:      subscriptions,
+		UserID:             &userID,
+		ServiceName:        &serviceName,
+		StartDate:          &startDate,
+		EndDate:            &endDate,
+		SubscriptionsCount: 2,
 	}
 
 	req := httptest.NewRequest("GET", "/stats/total?user_id="+userID.String()+"&service_name=Netflix&start_date=01-2024&end_date=12-2024", nil)

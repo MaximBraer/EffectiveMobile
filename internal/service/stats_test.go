@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"EffectiveMobile/internal/repository"
+
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/mock/gomock"
@@ -31,10 +32,10 @@ func TestStatsService(t *testing.T) {
 func (s *StatsServiceSuite) SetupTest() {
 	s.ctrl = gomock.NewController(s.T())
 	s.statsRepo = NewMockStatsRepository(s.ctrl)
-	
+
 	s.logger = slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	s.ctx = context.Background()
-	
+
 	s.statsService = NewStatsService(s.statsRepo, s.logger)
 }
 
@@ -78,12 +79,12 @@ func (s *StatsServiceSuite) TestGetTotalCost_Success() {
 
 	expectedStats := repository.TotalCostStats{
 		TotalCost:          3100,
-		Subscriptions:       subscriptions,
-		UserID:              &userID,
-		ServiceName:         &serviceName,
-		StartDate:           &startDate,
-		EndDate:             &endDate,
-		SubscriptionsCount:  2,
+		Subscriptions:      subscriptions,
+		UserID:             &userID,
+		ServiceName:        &serviceName,
+		StartDate:          &startDate,
+		EndDate:            &endDate,
+		SubscriptionsCount: 2,
 	}
 
 	s.statsRepo.EXPECT().
@@ -145,12 +146,12 @@ func (s *StatsServiceSuite) TestGetTotalCost_WithPartialAndOutsidePeriod() {
 
 	expectedStats := repository.TotalCostStats{
 		TotalCost:          700,
-		Subscriptions:       subscriptions,
-		UserID:              &userID,
-		ServiceName:         &serviceName,
-		StartDate:           &startDate,
-		EndDate:             &endDate,
-		SubscriptionsCount:  3,
+		Subscriptions:      subscriptions,
+		UserID:             &userID,
+		ServiceName:        &serviceName,
+		StartDate:          &startDate,
+		EndDate:            &endDate,
+		SubscriptionsCount: 3,
 	}
 
 	s.statsRepo.EXPECT().
@@ -237,10 +238,10 @@ func (s *StatsServiceSuite) TestFormatDate_NilDate() {
 }
 
 func (s *StatsServiceSuite) TestFormatUUID_Success() {
-	uuid := uuid.New()
-	expected := uuid.String()
+	uid := uuid.New()
+	expected := uid.String()
 
-	result := s.statsService.FormatUUID(&uuid)
+	result := s.statsService.FormatUUID(&uid)
 
 	s.Equal(&expected, result)
 }

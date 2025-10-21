@@ -75,7 +75,7 @@ func main() {
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
-	
+
 	sig := <-quit
 	log.Info("received shutdown signal", slog.String("signal", sig.String()))
 
@@ -83,13 +83,16 @@ func main() {
 	defer cancel()
 
 	log.Info("shutting down server...")
-	
+
 	if err := srv.Shutdown(ctx); err != nil {
 		log.Error("server forced to shutdown", slog.String("err", err.Error()))
 	}
 
 	log.Info("closing database connections...")
-	provider.Close()
+	err = provider.Close()
+	if err != nil {
+		log.Error("failed to close database connections", slog.String("err", err.Error()))
+	}
 
 	log.Info("server stopped")
 }

@@ -18,7 +18,6 @@ func NewRouter(log *slog.Logger, serviceRepo *repository.ServiceRepository, subs
 	router.Use(middleware.RequestID)
 	router.Use(middleware.Recoverer)
 	router.Use(middleware.URLFormat)
-
 	router.Use(logger.New(log))
 
 	subscriptionService := service.NewSubscriptionService(serviceRepo, subscriptionRepo, log)
