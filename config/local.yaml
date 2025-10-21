@@ -1,0 +1,15 @@
+env: "local"
+http_server:
+  address: "0.0.0.0:8080"
+  timeout: 4s
+  idle_timeout: 60s
+sql_data_base:
+  user: "postgres"
+  password: "postgres"
+  data_base_info:
+    server: "postgres"
+    database: "subscriptions"
+    max_idle_cons: 2
+    max_open_cons: 10
+    conn_max_lifetime: 3600
+    port: "5432"
