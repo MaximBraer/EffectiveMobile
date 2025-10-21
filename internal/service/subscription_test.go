@@ -189,19 +189,6 @@ func (s *SubscriptionServiceSuite) TestUpdateSubscription_Success() {
 	startDate := "02-2024"
 	endDate := "04-2024"
 
-	existingSubscription := repository.Subscription{
-		ID:          subscriptionID,
-		UserID:      uuid.New(),
-		ServiceName: "Netflix",
-		Price:       500,
-		StartDate:   time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
-		EndDate:     nil,
-	}
-
-	s.subscriptionRepo.EXPECT().
-		GetSubscription(s.ctx, subscriptionID).
-		Return(existingSubscription, nil)
-
 	s.subscriptionRepo.EXPECT().
 		UpdateSubscription(s.ctx, repository.UpdateSubscriptionParams{
 			ID:        subscriptionID,
@@ -223,8 +210,13 @@ func (s *SubscriptionServiceSuite) TestUpdateSubscription_NotFound() {
 	notFoundError := repository.ErrSubscriptionNotFound
 
 	s.subscriptionRepo.EXPECT().
-		GetSubscription(s.ctx, subscriptionID).
-		Return(repository.Subscription{}, notFoundError)
+		UpdateSubscription(s.ctx, repository.UpdateSubscriptionParams{
+			ID:        subscriptionID,
+			PriceRub:  &price,
+			StartDate: &[]time.Time{time.Date(2024, 2, 1, 0, 0, 0, 0, time.UTC)}[0],
+			EndDate:   nil,
+		}).
+		Return(notFoundError)
 
 	err := s.subscriptionService.UpdateSubscription(s.ctx, subscriptionID, &price, &startDate, nil)
 

@@ -64,11 +64,18 @@ func (r *StatsRepository) GetTotalCost(ctx context.Context, p GetTotalCostParams
 		whereConditions = append(whereConditions, squirrel.Eq{"sv.name": *p.ServiceName})
 	}
 
-	if p.StartDate != nil {
-		whereConditions = append(whereConditions, squirrel.GtOrEq{"s.start_date": *p.StartDate})
-	}
-
-	if p.EndDate != nil {
+	if p.StartDate != nil && p.EndDate != nil {
+		whereConditions = append(whereConditions, squirrel.LtOrEq{"s.start_date": *p.EndDate})
+		whereConditions = append(whereConditions, squirrel.Or{
+			squirrel.Eq{"s.end_date": nil},
+			squirrel.GtOrEq{"s.end_date": *p.StartDate},
+		})
+	} else if p.StartDate != nil {
+		whereConditions = append(whereConditions, squirrel.Or{
+			squirrel.Eq{"s.end_date": nil},
+			squirrel.GtOrEq{"s.end_date": *p.StartDate},
+		})
+	} else if p.EndDate != nil {
 		whereConditions = append(whereConditions, squirrel.LtOrEq{"s.start_date": *p.EndDate})
 	}
 

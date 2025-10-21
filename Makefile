@@ -33,7 +33,7 @@ docker-down:
 	docker-compose down
 
 gen_swagger:
-	go run github.com/swaggo/swag/cmd/swag@latest init --requiredByDefault --parseDependency --parseInternal --parseDepth 2 --parseGoList --output=./.static/swagger --outputTypes=json -g ./cmd/main.go
+	go run github.com/swaggo/swag/cmd/swag@latest init --requiredByDefault --parseDependency --parseInternal --parseDepth 2 --parseGoList --output=./.static/swagger --outputTypes=json -g ./cmd/subscription/main.go
 
 reset-db: docker-down clean docker-up migrate-up
 

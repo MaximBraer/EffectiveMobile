@@ -46,6 +46,20 @@ func getAPIResponse(
 
 	return respBody, resp, nil
 }
+
+func deleteAPIResponse(
+	serviceHost,
+	path string,
+	cookies []*http.Cookie,
+) (*http.Response, error) {
+	_, resp, err := doRequest(http.MethodDelete, serviceHost, path, nil, nil, cookies)
+	if err != nil {
+		return nil, fmt.Errorf("can't do delete: %w", err)
+	}
+
+	return resp, nil
+}
+
 func doRequest(
 	method string,
 	serviceHost string,

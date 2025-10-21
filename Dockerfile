@@ -17,6 +17,7 @@ COPY --from=builder /app/main .
 COPY --from=builder /app/migrator .
 COPY --from=builder /app/config ./config
 COPY --from=builder /app/migrations ./migrations
+COPY --from=builder /app/.static ./.static
 COPY docker-entrypoint.sh .
 RUN chmod +x docker-entrypoint.sh
 

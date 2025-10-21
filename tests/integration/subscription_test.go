@@ -188,14 +188,14 @@ func (s *SubscriptionSuite) TestDeleteSubscription() {
 	userID := uuid.New()
 	subscriptionID := s.createSubscription("Netflix", 500, userID, "01-2024", "")
 
-	_, resp, err := getAPIResponse(mainHost, fmt.Sprintf("/api/v1/subscriptions/%d", subscriptionID), nil, nil)
+	resp, err := deleteAPIResponse(mainHost, fmt.Sprintf("/api/v1/subscriptions/%d", subscriptionID), nil)
 	s.NoError(err)
-	s.Equal(200, resp.StatusCode)
+	s.Equal(204, resp.StatusCode)
 
 	var count int
 	err = s.DB.QueryRow(`SELECT COUNT(*) FROM subscription WHERE id = $1`, subscriptionID).Scan(&count)
 	s.NoError(err)
-	s.Equal(1, count)
+	s.Equal(0, count)
 }
 
 func (s *SubscriptionSuite) TestListSubscriptions() {

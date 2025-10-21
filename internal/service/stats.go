@@ -90,7 +90,8 @@ func (s *StatsService) calculateIntersectionMonths(
 ) int {
 	if periodStart == nil && periodEnd == nil {
 		if subscriptionEnd == nil {
-			return 1
+			now := time.Now()
+			return s.monthsBetween(subscriptionStart, now)
 		}
 		return s.monthsBetween(subscriptionStart, *subscriptionEnd)
 	}

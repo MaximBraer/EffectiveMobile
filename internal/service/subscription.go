@@ -69,9 +69,6 @@ func (s *SubscriptionService) CreateSubscription(ctx context.Context, serviceNam
 		return 0, err
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-
 	id, err := s.subscriptionRepo.CreateSubscription(ctx, repository.CreateSubscriptionParams{
 		UserID:    userID,
 		ServiceID: serviceID,
@@ -104,20 +101,9 @@ func (s *SubscriptionService) UpdateSubscription(ctx context.Context, id int64, 
 	const op = "service.subscription.UpdateSubscription"
 	log := s.log.With(slog.String("op", op))
 
-	existing, err := s.subscriptionRepo.GetSubscription(ctx, id)
-	if err != nil {
-		log.Error("get subscription failed", slog.String("err", err.Error()))
-		return err
-	}
-
 	updateParams := repository.UpdateSubscriptionParams{
-		ID: id,
-	}
-
-	if price != nil {
-		updateParams.PriceRub = price
-	} else {
-		updateParams.PriceRub = &existing.Price
+		ID:      id,
+		PriceRub: price,
 	}
 
 	if startDate != nil {
@@ -126,8 +112,6 @@ func (s *SubscriptionService) UpdateSubscription(ctx context.Context, id int64, 
 			return err
 		}
 		updateParams.StartDate = &startDateParsed
-	} else {
-		updateParams.StartDate = &existing.StartDate
 	}
 
 	if endDate != nil {
@@ -135,15 +119,13 @@ func (s *SubscriptionService) UpdateSubscription(ctx context.Context, id int64, 
 		if err != nil {
 			return err
 		}
-		if endDateParsed.Before(*updateParams.StartDate) {
+		if updateParams.StartDate != nil && endDateParsed.Before(*updateParams.StartDate) {
 			return fmt.Errorf("end date must be after start date")
 		}
 		updateParams.EndDate = &endDateParsed
-	} else {
-		updateParams.EndDate = existing.EndDate
 	}
 
-	err = s.subscriptionRepo.UpdateSubscription(ctx, updateParams)
+	err := s.subscriptionRepo.UpdateSubscription(ctx, updateParams)
 	if err != nil {
 		log.Error("update subscription failed", slog.String("err", err.Error()))
 		return err

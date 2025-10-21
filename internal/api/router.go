@@ -6,9 +6,11 @@ import (
 	"EffectiveMobile/internal/repository"
 	"EffectiveMobile/internal/service"
 	"log/slog"
+	"net/http"
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
+	httpSwagger "github.com/swaggo/http-swagger"
 )
 
 func NewRouter(log *slog.Logger, serviceRepo *repository.ServiceRepository, subscriptionRepo *repository.SubscriptionRepository, statsRepo *repository.StatsRepository) chi.Router {
@@ -22,6 +24,13 @@ func NewRouter(log *slog.Logger, serviceRepo *repository.ServiceRepository, subs
 
 	subscriptionService := service.NewSubscriptionService(serviceRepo, subscriptionRepo, log)
 	statsService := service.NewStatsService(statsRepo, log)
+
+	fs := http.FileServer(http.Dir(".static/swagger"))
+	router.Handle("/static/swagger/*", http.StripPrefix("/static/swagger", fs))
+
+	router.Get("/swagger/*", httpSwagger.Handler(
+		httpSwagger.URL("/static/swagger/swagger.json"),
+	))
 
 	router.Route("/api/v1", func(r chi.Router) {
 		r.Route("/subscriptions", func(r chi.Router) {

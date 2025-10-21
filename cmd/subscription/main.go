@@ -26,7 +26,7 @@ const (
 // @contact.name    Maksim Braer
 // @contact.email   braer.maks@gmail.com
 // @host            localhost:8080
-// @BasePath        /api/v1.
+// @BasePath        /api/v1
 func main() {
 	cfg, err := config.MustLoad()
 	if err != nil {
