@@ -28,7 +28,7 @@ func NewRouter(log *slog.Logger, serviceRepo *repository.ServiceRepository, subs
 		r.Route("/subscriptions", func(r chi.Router) {
 			r.Mount("/", handlers.GetSubscriptionsRoutes(subscriptionService, statsService, log))
 		})
-		r.Mount("/stats", handlers.GetStatRoutes(subscriptionService, statsService, log))
+		r.Mount("/stats", handlers.GetStatRoutes(statsService, log))
 	})
 
 	router.Route("/swagger", func(r chi.Router) {

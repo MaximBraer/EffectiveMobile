@@ -69,7 +69,7 @@ type Filters struct {
 // @Failure      400           {object}  map[string]string
 // @Failure      500           {object}  map[string]string
 // @Router       /stats/total [get]
-func GetTotalStats(subscriptionService SubscriptionService, statsService StatsService, log *slog.Logger) http.HandlerFunc {
+func GetTotalStats(statsService StatsService, log *slog.Logger) http.HandlerFunc {
 	const op = "handlers.api.stats.GetTotalStats"
 	log = log.With(slog.String("op", op))
 
@@ -152,8 +152,8 @@ func GetTotalStats(subscriptionService SubscriptionService, statsService StatsSe
 	}
 }
 
-func GetStatRoutes(subscriptionService SubscriptionService, statsService StatsService, log *slog.Logger) chi.Router {
+func GetStatRoutes(statsService StatsService, log *slog.Logger) chi.Router {
 	r := chi.NewRouter()
-	r.Get("/total", GetTotalStats(subscriptionService, statsService, log))
+	r.Get("/total", GetTotalStats(statsService, log))
 	return r
 }

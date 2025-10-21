@@ -16,8 +16,18 @@ type GetTotalCostParams struct {
 	EndDate     *time.Time
 }
 
+type SubscriptionCost struct {
+	ID          int64
+	StartDate   time.Time
+	EndDate     *time.Time
+	PriceRub    int
+	UserID      uuid.UUID
+	ServiceName string
+}
+
 type TotalCostStats struct {
 	TotalCost          int
+	Subscriptions      []SubscriptionCost
 	StartDate          *time.Time
 	EndDate            *time.Time
 	UserID             *uuid.UUID
@@ -67,28 +77,64 @@ func (r *StatsRepository) GetTotalCost(ctx context.Context, p GetTotalCostParams
 
 	query, args, err := baseQuery.
 		Columns(
-			"COALESCE(SUM(s.price_rub), 0) as total_cost",
-			"COUNT(*) as subscriptions_count",
+			"s.id",
+			"s.start_date",
+			"s.end_date",
+			"s.price_rub",
+			"s.user_id",
+			"sv.name",
 		).
 		ToSql()
 	if err != nil {
 		return TotalCostStats{}, fmt.Errorf("could not build query: %w", err)
 	}
 
-	var stats TotalCostStats
-	err = r.provider.GetConn().QueryRowContext(ctx, query, args...).Scan(
-		&stats.TotalCost,
-		&stats.SubscriptionsCount,
-	)
+	rows, err := r.provider.GetConn().QueryContext(ctx, query, args...)
 	if err != nil {
 		return TotalCostStats{}, fmt.Errorf("failed to execute query: %w", err)
 	}
+	defer rows.Close()
 
-	// Устанавливаем параметры запроса в результат
-	stats.UserID = p.UserID
-	stats.ServiceName = p.ServiceName
-	stats.StartDate = p.StartDate
-	stats.EndDate = p.EndDate
+	var subscriptions []SubscriptionCost
+	for rows.Next() {
+		var id int64
+		var startDate, endDate time.Time
+		var priceRub int
+		var userID uuid.UUID
+		var serviceName string
+		var endDatePtr *time.Time
+
+		err := rows.Scan(&id, &startDate, &endDate, &priceRub, &userID, &serviceName)
+		if err != nil {
+			return TotalCostStats{}, fmt.Errorf("failed to scan row: %w", err)
+		}
+
+		if !endDate.IsZero() {
+			endDatePtr = &endDate
+		}
+
+		subscriptions = append(subscriptions, SubscriptionCost{
+			ID:          id,
+			StartDate:   startDate,
+			EndDate:     endDatePtr,
+			PriceRub:    priceRub,
+			UserID:      userID,
+			ServiceName: serviceName,
+		})
+	}
+
+	if err = rows.Err(); err != nil {
+		return TotalCostStats{}, fmt.Errorf("error iterating rows: %w", err)
+	}
+
+	stats := TotalCostStats{
+		Subscriptions:      subscriptions,
+		UserID:             p.UserID,
+		ServiceName:        p.ServiceName,
+		StartDate:          p.StartDate,
+		EndDate:            p.EndDate,
+		SubscriptionsCount: len(subscriptions),
+	}
 
 	return stats, nil
 }

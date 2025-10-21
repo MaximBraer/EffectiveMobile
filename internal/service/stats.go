@@ -42,6 +42,9 @@ func (s *StatsService) GetTotalCost(ctx context.Context, userID *uuid.UUID, serv
 		return nil, err
 	}
 
+	totalCost := s.calculateTotalCost(stats.Subscriptions, startDate, endDate)
+	stats.TotalCost = totalCost
+
 	return &stats, nil
 }
 
@@ -67,3 +70,77 @@ func (s *StatsService) FormatUUID(uuid *uuid.UUID) *string {
 	str := uuid.String()
 	return &str
 }
+
+func (s *StatsService) calculateTotalCost(subscriptions []repository.SubscriptionCost, periodStart, periodEnd *time.Time) int {
+	totalCost := 0
+
+	for _, sub := range subscriptions {
+		months := s.calculateIntersectionMonths(sub.StartDate, sub.EndDate, periodStart, periodEnd)
+		totalCost += sub.PriceRub * months
+	}
+
+	return totalCost
+}
+
+func (s *StatsService) calculateIntersectionMonths(
+	subscriptionStart time.Time,
+	subscriptionEnd *time.Time,
+	periodStart *time.Time,
+	periodEnd *time.Time,
+) int {
+	if periodStart == nil && periodEnd == nil {
+		if subscriptionEnd == nil {
+			return 1
+		}
+		return s.monthsBetween(subscriptionStart, *subscriptionEnd)
+	}
+
+	var intersectionStart, intersectionEnd time.Time
+
+	if periodStart == nil {
+		intersectionStart = subscriptionStart
+	} else {
+		if subscriptionStart.After(*periodStart) {
+			intersectionStart = subscriptionStart
+		} else {
+			intersectionStart = *periodStart
+		}
+	}
+
+	if subscriptionEnd == nil {
+		if periodEnd == nil {
+			return 1
+		}
+		intersectionEnd = *periodEnd
+	} else {
+		if periodEnd == nil {
+			intersectionEnd = *subscriptionEnd
+		} else {
+			if subscriptionEnd.Before(*periodEnd) {
+				intersectionEnd = *subscriptionEnd
+			} else {
+				intersectionEnd = *periodEnd
+			}
+		}
+	}
+
+	if intersectionStart.After(intersectionEnd) {
+		return 0
+	}
+
+	return s.monthsBetween(intersectionStart, intersectionEnd)
+}
+
+func (s *StatsService) monthsBetween(start, end time.Time) int {
+	start = time.Date(start.Year(), start.Month(), 1, 0, 0, 0, 0, start.Location())
+	end = time.Date(end.Year(), end.Month(), 1, 0, 0, 0, 0, end.Location())
+
+	months := 0
+	for start.Before(end) || start.Equal(end) {
+		start = start.AddDate(0, 1, 0)
+		months++
+	}
+
+	return months
+}
+

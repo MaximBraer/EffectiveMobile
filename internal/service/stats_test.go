@@ -45,16 +45,45 @@ func (s *StatsServiceSuite) TearDownTest() {
 func (s *StatsServiceSuite) TestGetTotalCost_Success() {
 	userID := uuid.New()
 	serviceName := "Netflix"
-	startDate := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
-	endDate := time.Date(2024, 12, 31, 23, 59, 59, 0, time.UTC)
+	startDate := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
+	endDate := time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC)
+
+	subscriptions := []repository.SubscriptionCost{
+		{
+			ID:          1,
+			StartDate:   time.Date(2025, 3, 1, 0, 0, 0, 0, time.UTC),
+			EndDate:     timePtr(time.Date(2025, 12, 1, 0, 0, 0, 0, time.UTC)),
+			PriceRub:    400,
+			UserID:      userID,
+			ServiceName: serviceName,
+		},
+		{
+			ID:          2,
+			StartDate:   time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC),
+			EndDate:     timePtr(time.Date(2025, 3, 1, 0, 0, 0, 0, time.UTC)),
+			PriceRub:    500,
+			UserID:      userID,
+			ServiceName: serviceName,
+		},
+	}
+
+	repoStats := repository.TotalCostStats{
+		Subscriptions:      subscriptions,
+		UserID:             &userID,
+		ServiceName:        &serviceName,
+		StartDate:          &startDate,
+		EndDate:            &endDate,
+		SubscriptionsCount: 2,
+	}
 
 	expectedStats := repository.TotalCostStats{
-		TotalCost:           5000,
+		TotalCost:          3100,
+		Subscriptions:       subscriptions,
 		UserID:              &userID,
 		ServiceName:         &serviceName,
 		StartDate:           &startDate,
 		EndDate:             &endDate,
-		SubscriptionsCount:  10,
+		SubscriptionsCount:  2,
 	}
 
 	s.statsRepo.EXPECT().
@@ -64,7 +93,74 @@ func (s *StatsServiceSuite) TestGetTotalCost_Success() {
 			StartDate:   &startDate,
 			EndDate:     &endDate,
 		}).
-		Return(expectedStats, nil)
+		Return(repoStats, nil)
+
+	result, err := s.statsService.GetTotalCost(s.ctx, &userID, &serviceName, &startDate, &endDate)
+
+	s.NoError(err)
+	s.Equal(&expectedStats, result)
+}
+
+func (s *StatsServiceSuite) TestGetTotalCost_WithPartialAndOutsidePeriod() {
+	userID := uuid.New()
+	serviceName := "Netflix"
+	startDate := time.Date(2025, 3, 1, 0, 0, 0, 0, time.UTC)
+	endDate := time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC)
+
+	subscriptions := []repository.SubscriptionCost{
+		{
+			ID:          1,
+			StartDate:   time.Date(2025, 3, 1, 0, 0, 0, 0, time.UTC),
+			EndDate:     timePtr(time.Date(2025, 5, 1, 0, 0, 0, 0, time.UTC)),
+			PriceRub:    100,
+			UserID:      userID,
+			ServiceName: serviceName,
+		},
+		{
+			ID:          2,
+			StartDate:   time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC),
+			EndDate:     timePtr(time.Date(2025, 4, 1, 0, 0, 0, 0, time.UTC)),
+			PriceRub:    200,
+			UserID:      userID,
+			ServiceName: serviceName,
+		},
+		{
+			ID:          3,
+			StartDate:   time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+			EndDate:     timePtr(time.Date(2024, 12, 1, 0, 0, 0, 0, time.UTC)),
+			PriceRub:    300,
+			UserID:      userID,
+			ServiceName: serviceName,
+		},
+	}
+
+	repoStats := repository.TotalCostStats{
+		Subscriptions:      subscriptions,
+		UserID:             &userID,
+		ServiceName:        &serviceName,
+		StartDate:          &startDate,
+		EndDate:            &endDate,
+		SubscriptionsCount: 3,
+	}
+
+	expectedStats := repository.TotalCostStats{
+		TotalCost:          700,
+		Subscriptions:       subscriptions,
+		UserID:              &userID,
+		ServiceName:         &serviceName,
+		StartDate:           &startDate,
+		EndDate:             &endDate,
+		SubscriptionsCount:  3,
+	}
+
+	s.statsRepo.EXPECT().
+		GetTotalCost(s.ctx, repository.GetTotalCostParams{
+			UserID:      &userID,
+			ServiceName: &serviceName,
+			StartDate:   &startDate,
+			EndDate:     &endDate,
+		}).
+		Return(repoStats, nil)
 
 	result, err := s.statsService.GetTotalCost(s.ctx, &userID, &serviceName, &startDate, &endDate)
 
@@ -153,4 +249,8 @@ func (s *StatsServiceSuite) TestFormatUUID_NilUUID() {
 	result := s.statsService.FormatUUID(nil)
 
 	s.Nil(result)
+}
+
+func timePtr(t time.Time) *time.Time {
+	return &t
 }

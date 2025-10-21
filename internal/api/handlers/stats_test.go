@@ -49,13 +49,33 @@ func (s *StatsHandlersSuite) TestGetTotalStats_Success() {
 	startDate := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 	endDate := time.Date(2024, 12, 31, 23, 59, 59, 0, time.UTC)
 
+	subscriptions := []repository.SubscriptionCost{
+		{
+			ID:          1,
+			StartDate:   time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+			EndDate:     &endDate,
+			PriceRub:    100,
+			UserID:      userID,
+			ServiceName: serviceName,
+		},
+		{
+			ID:          2,
+			StartDate:   time.Date(2024, 6, 1, 0, 0, 0, 0, time.UTC),
+			EndDate:     &endDate,
+			PriceRub:    200,
+			UserID:      userID,
+			ServiceName: serviceName,
+		},
+	}
+
 	expectedStats := &repository.TotalCostStats{
-		TotalCost:           5000,
+		TotalCost:           2600,
+		Subscriptions:       subscriptions,
 		UserID:              &userID,
 		ServiceName:         &serviceName,
 		StartDate:           &startDate,
 		EndDate:             &endDate,
-		SubscriptionsCount:  10,
+		SubscriptionsCount:  2,
 	}
 
 	req := httptest.NewRequest("GET", "/stats/total?user_id="+userID.String()+"&service_name=Netflix&start_date=01-2024&end_date=12-2024", nil)
@@ -85,7 +105,7 @@ func (s *StatsHandlersSuite) TestGetTotalStats_Success() {
 		FormatUUID(&userID).
 		Return(&[]string{userID.String()}[0])
 
-	GetTotalStats(s.subscriptionService, s.statsService, s.logger)(w, req)
+	GetTotalStats(s.statsService, s.logger)(w, req)
 
 	s.Equal(http.StatusOK, w.Code)
 
@@ -117,7 +137,7 @@ func (s *StatsHandlersSuite) TestGetTotalStats_ServiceError() {
 		GetTotalCost(gomock.Any(), &userID, &serviceName, &startDate, &endDate).
 		Return(nil, repository.ErrSubscriptionNotCreated)
 
-	GetTotalStats(s.subscriptionService, s.statsService, s.logger)(w, req)
+	GetTotalStats(s.statsService, s.logger)(w, req)
 
 	s.Equal(http.StatusInternalServerError, w.Code)
 }
@@ -132,7 +152,7 @@ func (s *StatsHandlersSuite) TestGetTotalStats_InvalidDate() {
 		ParseMonth("invalid-date").
 		Return(time.Time{}, repository.ErrInvalidDateFormat)
 
-	GetTotalStats(s.subscriptionService, s.statsService, s.logger)(w, req)
+	GetTotalStats(s.statsService, s.logger)(w, req)
 
 	s.Equal(http.StatusBadRequest, w.Code)
 }
@@ -153,7 +173,7 @@ func (s *StatsHandlersSuite) TestGetTotalStats_EndDateBeforeStartDate() {
 		ParseMonth("01-2024").
 		Return(endDate, nil)
 
-	GetTotalStats(s.subscriptionService, s.statsService, s.logger)(w, req)
+	GetTotalStats(s.statsService, s.logger)(w, req)
 
 	s.Equal(http.StatusBadRequest, w.Code)
 }
