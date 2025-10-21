@@ -7,8 +7,8 @@ import (
 	"EffectiveMobile/pkg/api/response"
 	"context"
 	"encoding/json"
-	"fmt"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"time"
@@ -20,8 +20,8 @@ import (
 
 const (
 	ErrInvalidStatsArguments = "invalid arguments"
-	ErrInvalidUserID        = "invalid user_id format"
-	ErrInternalServerStats  = "internal server error"
+	ErrInvalidUserID         = "invalid user_id format"
+	ErrInternalServerStats   = "internal server error"
 )
 
 var ErrValidation = errors.New("validation error")

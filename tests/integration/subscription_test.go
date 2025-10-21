@@ -4,8 +4,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"net/http"
 	"log/slog"
+	"net/http"
 	"os"
 	"testing"
 	"time"
@@ -79,7 +79,6 @@ func (s *SubscriptionSuite) initDatabase() {
 	s.DB = provider.GetConn()
 }
 
-
 func (s *SubscriptionSuite) clearDatabase() {
 	_, err := s.DB.Exec(`TRUNCATE TABLE subscription CASCADE`)
 	s.NoError(err)
@@ -102,7 +101,7 @@ func (s *SubscriptionSuite) TestCreateSubscription() {
 				 JOIN service sv ON s.service_id = sv.id 
 				 WHERE s.id = $1`,
 				subscriptionID,
-			).Scan(&subscription.ID, &subscription.ServiceName, &subscription.Price, 
+			).Scan(&subscription.ID, &subscription.ServiceName, &subscription.Price,
 				&subscription.UserID, &subscription.StartDate, &subscription.EndDate)
 
 			if errors.Is(err, sql.ErrNoRows) {
@@ -134,12 +133,12 @@ func (s *SubscriptionSuite) TestGetSubscription() {
 	s.Equal(200, resp.StatusCode)
 
 	var subscription struct {
-		ID          int64      `json:"id"`
-		ServiceName string     `json:"service_name"`
-		Price       int        `json:"price"`
-		UserID      uuid.UUID  `json:"user_id"`
-		StartDate   string     `json:"start_date"`
-		EndDate     *string    `json:"end_date"`
+		ID          int64     `json:"id"`
+		ServiceName string    `json:"service_name"`
+		Price       int       `json:"price"`
+		UserID      uuid.UUID `json:"user_id"`
+		StartDate   string    `json:"start_date"`
+		EndDate     *string   `json:"end_date"`
 	}
 	err = jsoniter.Unmarshal(respBody, &subscription)
 	s.NoError(err)
@@ -162,7 +161,9 @@ func (s *SubscriptionSuite) TestUpdateSubscription() {
 	s.NoError(err)
 	s.Equal(200, resp.StatusCode)
 
-	var response struct{ Status string `json:"status"` }
+	var response struct {
+		Status string `json:"status"`
+	}
 	err = jsoniter.Unmarshal(respBody, &response)
 	s.NoError(err)
 	s.Equal("ok", response.Status)
@@ -174,7 +175,7 @@ func (s *SubscriptionSuite) TestUpdateSubscription() {
 		 JOIN service sv ON s.service_id = sv.id 
 		 WHERE s.id = $1`,
 		subscriptionID,
-	).Scan(&subscription.ID, &subscription.ServiceName, &subscription.Price, 
+	).Scan(&subscription.ID, &subscription.ServiceName, &subscription.Price,
 		&subscription.UserID, &subscription.StartDate, &subscription.EndDate)
 
 	s.NoError(err)
@@ -209,17 +210,17 @@ func (s *SubscriptionSuite) TestListSubscriptions() {
 	s.NoError(err)
 	s.Equal(200, resp.StatusCode)
 
-    var response struct {
-        Subscriptions []struct {
-            ID          int64   `json:"id"`
-            ServiceName string  `json:"service_name"`
-            Price       int     `json:"price"`
-            UserID      string  `json:"user_id"`
-            StartDate   string  `json:"start_date"`
-            EndDate     *string `json:"end_date,omitempty"`
-        } `json:"subscriptions"`
-        Total int `json:"total"`
-    }
+	var response struct {
+		Subscriptions []struct {
+			ID          int64   `json:"id"`
+			ServiceName string  `json:"service_name"`
+			Price       int     `json:"price"`
+			UserID      string  `json:"user_id"`
+			StartDate   string  `json:"start_date"`
+			EndDate     *string `json:"end_date,omitempty"`
+		} `json:"subscriptions"`
+		Total int `json:"total"`
+	}
 	err = jsoniter.Unmarshal(respBody, &response)
 	s.NoError(err)
 
@@ -227,12 +228,12 @@ func (s *SubscriptionSuite) TestListSubscriptions() {
 	s.Equal(2, response.Total)
 
 	s.Require().GreaterOrEqual(len(response.Subscriptions), 2)
-    s.Equal("Netflix", response.Subscriptions[0].ServiceName)
-    s.Equal(500, response.Subscriptions[0].Price)
-    s.Equal("01-2024", response.Subscriptions[0].StartDate)
-    s.Equal("Spotify", response.Subscriptions[1].ServiceName)
-    s.Equal(300, response.Subscriptions[1].Price)
-    s.Equal("02-2024", response.Subscriptions[1].StartDate)
+	s.Equal("Netflix", response.Subscriptions[0].ServiceName)
+	s.Equal(500, response.Subscriptions[0].Price)
+	s.Equal("01-2024", response.Subscriptions[0].StartDate)
+	s.Equal("Spotify", response.Subscriptions[1].ServiceName)
+	s.Equal(300, response.Subscriptions[1].Price)
+	s.Equal("02-2024", response.Subscriptions[1].StartDate)
 }
 
 func (s *SubscriptionSuite) TestGetTotalStats() {

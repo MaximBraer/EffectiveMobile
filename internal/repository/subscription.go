@@ -18,6 +18,7 @@ var (
 	ErrSubscriptionAlreadyExists = errors.New("subscription already exists")
 	ErrSubscriptionNotFound      = errors.New("subscription not found")
 	ErrSubscriptionNotCreated    = errors.New("subscription not created")
+	ErrInvalidData               = errors.New("invalid arguments")
 )
 
 type CreateSubscriptionParams struct {
@@ -148,8 +149,13 @@ func (r *SubscriptionRepository) UpdateSubscription(ctx context.Context, p Updat
 	result, err := r.provider.GetConn().ExecContext(ctx, query, args...)
 	if err != nil {
 		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
-			return ErrSubscriptionAlreadyExists
+		if errors.As(err, &pgErr) {
+			if pgErr.Code == pgerrcode.UniqueViolation {
+				return ErrSubscriptionAlreadyExists
+			}
+			if pgErr.Code == pgerrcode.CheckViolation {
+				return ErrInvalidData
+			}
 		}
 		return fmt.Errorf("failed to execute query: %w", err)
 	}

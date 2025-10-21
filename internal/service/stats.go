@@ -147,4 +147,3 @@ func (s *StatsService) monthsBetween(start, end time.Time) int {
 
 	return months
 }
-

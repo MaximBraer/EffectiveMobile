@@ -35,7 +35,7 @@ func main() {
 	}
 
 	log := setupLogger(cfg.Env)
-	log.Info("config loaded", slog.Any("cfg", cfg))
+
 	provider := postgres.New(
 		cfg.SQLDataBase.User,
 		cfg.SQLDataBase.Password,

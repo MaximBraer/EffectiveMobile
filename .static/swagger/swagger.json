@@ -117,8 +117,7 @@
                     "200": {
                         "description": "List of subscriptions with pagination",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/handlers.ListSubscriptionsResponse"
                         }
                     },
                     "400": {
@@ -403,6 +402,49 @@
             "type": "object",
             "properties": {
                 "end_date": {
+                    "type": "string",
+                    "example": "12-2024"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "price": {
+                    "type": "integer"
+                },
+                "service_name": {
+                    "type": "string"
+                },
+                "start_date": {
+                    "type": "string",
+                    "example": "01-2024"
+                },
+                "user_id": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                }
+            }
+        },
+        "handlers.GetTotalStatsResponse": {
+            "type": "object",
+            "properties": {
+                "filters": {
+                    "$ref": "#/definitions/handlers.Filters"
+                },
+                "period": {
+                    "$ref": "#/definitions/handlers.Period"
+                },
+                "subscriptions_count": {
+                    "type": "integer"
+                },
+                "total_cost": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handlers.ListSubscriptionsItem": {
+            "type": "object",
+            "properties": {
+                "end_date": {
                     "type": "string"
                 },
                 "id": {
@@ -422,19 +464,22 @@
                 }
             }
         },
-        "handlers.GetTotalStatsResponse": {
+        "handlers.ListSubscriptionsResponse": {
             "type": "object",
             "properties": {
-                "filters": {
-                    "$ref": "#/definitions/handlers.Filters"
-                },
-                "period": {
-                    "$ref": "#/definitions/handlers.Period"
-                },
-                "subscriptions_count": {
+                "limit": {
                     "type": "integer"
                 },
-                "total_cost": {
+                "offset": {
+                    "type": "integer"
+                },
+                "subscriptions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handlers.ListSubscriptionsItem"
+                    }
+                },
+                "total": {
                     "type": "integer"
                 }
             }

@@ -23,12 +23,12 @@ import (
 )
 
 const (
-	ErrInvalidArguments       = "invalid arguments"
-	ErrInvalidSubscriptionID  = "invalid subscription id"
-	ErrSubscriptionNotFound   = "subscription not found"
-	ErrSubscriptionExists     = "subscription already exists"
-	ErrInternalServer         = "internal server error"
-	ErrInvalidUserIDFormat    = "invalid user_id format"
+	ErrInvalidArguments      = "invalid arguments"
+	ErrInvalidSubscriptionID = "invalid subscription id"
+	ErrSubscriptionNotFound  = "subscription not found"
+	ErrSubscriptionExists    = "subscription already exists"
+	ErrInternalServer        = "internal server error"
+	ErrInvalidUserIDFormat   = "invalid user_id format"
 )
 
 type SubscriptionService interface {
@@ -69,11 +69,11 @@ func validateUpdateSubscriptionRequest(req UpdateSubscriptionRequest) error {
 	if err := validate.Struct(req); err != nil {
 		return err
 	}
-	
+
 	if req.ServiceName == nil && req.Price == nil && req.StartDate == nil && req.EndDate == nil {
 		return fmt.Errorf("at least one field must be provided")
 	}
-	
+
 	return nil
 }
 
@@ -81,9 +81,25 @@ type GetSubscriptionResponse struct {
 	ID          int64   `json:"id"`
 	ServiceName string  `json:"service_name"`
 	Price       int     `json:"price"`
+	UserID      string  `json:"user_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	StartDate   string  `json:"start_date" example:"01-2024"`
+	EndDate     *string `json:"end_date,omitempty" example:"12-2024"`
+}
+
+type ListSubscriptionsItem struct {
+	ID          int64   `json:"id"`
+	ServiceName string  `json:"service_name"`
+	Price       int     `json:"price"`
 	UserID      string  `json:"user_id"`
 	StartDate   string  `json:"start_date"`
 	EndDate     *string `json:"end_date,omitempty"`
+}
+
+type ListSubscriptionsResponse struct {
+	Subscriptions []ListSubscriptionsItem `json:"subscriptions"`
+	Total         int                     `json:"total"`
+	Limit         int                     `json:"limit"`
+	Offset        int                     `json:"offset"`
 }
 
 // @Summary      Create subscription
@@ -126,12 +142,12 @@ func SaveSubscription(subscriptionService SubscriptionService, log *slog.Logger)
 		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 		defer cancel()
 
-        id, err := subscriptionService.CreateSubscription(ctx, req.ServiceName, req.Price, req.UserID, req.StartDate, endDate)
+		id, err := subscriptionService.CreateSubscription(ctx, req.ServiceName, req.Price, req.UserID, req.StartDate, endDate)
 		if err != nil {
-            if errors.Is(err, serv.ErrValidation) {
-                response.WriteError(w, http.StatusBadRequest, ErrInvalidArguments)
-                return
-            }
+			if errors.Is(err, serv.ErrValidation) {
+				response.WriteError(w, http.StatusBadRequest, ErrInvalidArguments)
+				return
+			}
 			if errors.Is(err, repository.ErrSubscriptionAlreadyExists) {
 				response.WriteError(w, http.StatusConflict, ErrSubscriptionExists)
 				return
@@ -141,7 +157,7 @@ func SaveSubscription(subscriptionService SubscriptionService, log *slog.Logger)
 			return
 		}
 
-        w.Header().Set("Location", "/api/v1/subscriptions/"+strconv.FormatInt(id, 10))
+		w.Header().Set("Location", "/api/v1/subscriptions/"+strconv.FormatInt(id, 10))
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		_ = json.NewEncoder(w).Encode(CreateSubscriptionResponse{
@@ -252,18 +268,22 @@ func UpdateSubscription(subscriptionService SubscriptionService, log *slog.Logge
 		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 		defer cancel()
 
-        err = subscriptionService.UpdateSubscription(ctx, id, req.ServiceName, req.Price, req.StartDate, req.EndDate)
+		err = subscriptionService.UpdateSubscription(ctx, id, req.ServiceName, req.Price, req.StartDate, req.EndDate)
 		if err != nil {
-            if errors.Is(err, serv.ErrValidation) {
-                response.WriteError(w, http.StatusBadRequest, ErrInvalidArguments)
-                return
-            }
+			if errors.Is(err, serv.ErrValidation) {
+				response.WriteError(w, http.StatusBadRequest, ErrInvalidArguments)
+				return
+			}
 			if errors.Is(err, repository.ErrSubscriptionNotFound) {
 				response.WriteError(w, http.StatusNotFound, ErrSubscriptionNotFound)
 				return
 			}
 			if errors.Is(err, repository.ErrSubscriptionAlreadyExists) {
 				response.WriteError(w, http.StatusConflict, ErrSubscriptionExists)
+				return
+			}
+			if errors.Is(err, repository.ErrInvalidData) {
+				response.WriteError(w, http.StatusBadRequest, ErrInvalidArguments)
 				return
 			}
 			reqLog.Error("update subscription failed", slog.String("err", err.Error()))
@@ -327,7 +347,7 @@ func DeleteSubscription(subscriptionService SubscriptionService, log *slog.Logge
 // @Param        offset        query     int     false  "offset"  minimum(0)  default(0)
 // @Param        user_id       query     string  false  "user uuid"
 // @Param        service_name  query     string  false  "service name"
-// @Success      200           {object}  map[string]interface{}  "List of subscriptions with pagination"
+// @Success      200           {object}  ListSubscriptionsResponse  "List of subscriptions with pagination"
 // @Failure      400           {object}  ErrorResponse           "Invalid user_id format"
 // @Failure      500           {object}  ErrorResponse           "Internal server error"
 // @Router       /subscriptions [get]
@@ -388,37 +408,28 @@ func ListSubscriptions(subscriptionService SubscriptionService, log *slog.Logger
 			return
 		}
 
-        type listItem struct {
-            ID          int64   `json:"id"`
-            ServiceName string  `json:"service_name"`
-            Price       int     `json:"price"`
-            UserID      string  `json:"user_id"`
-            StartDate   string  `json:"start_date"`
-            EndDate     *string `json:"end_date,omitempty"`
-        }
+		items := make([]ListSubscriptionsItem, 0, len(subscriptions))
+		for _, s := range subscriptions {
+			item := ListSubscriptionsItem{
+				ID:          s.ID,
+				ServiceName: s.ServiceName,
+				Price:       s.Price,
+				UserID:      s.UserID.String(),
+				StartDate:   s.StartDate.Format("01-2006"),
+			}
+			if s.EndDate != nil {
+				ed := s.EndDate.Format("01-2006")
+				item.EndDate = &ed
+			}
+			items = append(items, item)
+		}
 
-        items := make([]listItem, 0, len(subscriptions))
-        for _, s := range subscriptions {
-            item := listItem{
-                ID:          s.ID,
-                ServiceName: s.ServiceName,
-                Price:       s.Price,
-                UserID:      s.UserID.String(),
-                StartDate:   s.StartDate.Format("01-2006"),
-            }
-            if s.EndDate != nil {
-                ed := s.EndDate.Format("01-2006")
-                item.EndDate = &ed
-            }
-            items = append(items, item)
-        }
-
-        result := map[string]interface{}{
-            "subscriptions": items,
-            "total":         total,
-            "limit":         limit,
-            "offset":        offset,
-        }
+		result := ListSubscriptionsResponse{
+			Subscriptions: items,
+			Total:         total,
+			Limit:         limit,
+			Offset:        offset,
+		}
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)

@@ -49,19 +49,19 @@ func (s *SubscriptionService) CreateSubscription(ctx context.Context, serviceNam
 	const op = "service.subscription.CreateSubscription"
 	log := s.log.With(slog.String("op", op))
 
-    startDateParsed, err := s.ParseMonth(startDate)
+	startDateParsed, err := s.ParseMonth(startDate)
 	if err != nil {
-        return 0, fmt.Errorf("%w: %s", ErrValidation, err.Error())
+		return 0, fmt.Errorf("%w: %s", ErrValidation, err.Error())
 	}
 
 	var endDatePtr *time.Time
-    if endDate != "" {
+	if endDate != "" {
 		ed, err := s.ParseMonth(endDate)
 		if err != nil {
-            return 0, fmt.Errorf("%w: %s", ErrValidation, err.Error())
+			return 0, fmt.Errorf("%w: %s", ErrValidation, err.Error())
 		}
 		if ed.Before(startDateParsed) {
-            return 0, fmt.Errorf("%w: end date must be after start date", ErrValidation)
+			return 0, fmt.Errorf("%w: end date must be after start date", ErrValidation)
 		}
 		endDatePtr = &ed
 	}
@@ -118,24 +118,24 @@ func (s *SubscriptionService) UpdateSubscription(ctx context.Context, id int64, 
 		updateParams.ServiceID = &serviceID
 	}
 
-    if startDate != nil {
+	if startDate != nil {
 		startDateParsed, err := s.ParseMonth(*startDate)
 		if err != nil {
-            return fmt.Errorf("%w: %s", ErrValidation, err.Error())
+			return fmt.Errorf("%w: %s", ErrValidation, err.Error())
 		}
 		updateParams.StartDate = &startDateParsed
 	}
 
-    if endDate != nil {
+	if endDate != nil {
 		if *endDate == "" || *endDate == "null" {
 			updateParams.EndDate = &time.Time{}
 		} else {
 			endDateParsed, err := s.ParseMonth(*endDate)
 			if err != nil {
-                return fmt.Errorf("%w: %s", ErrValidation, err.Error())
+				return fmt.Errorf("%w: %s", ErrValidation, err.Error())
 			}
 			if updateParams.StartDate != nil && endDateParsed.Before(*updateParams.StartDate) {
-                return fmt.Errorf("%w: end date must be after start date", ErrValidation)
+				return fmt.Errorf("%w: end date must be after start date", ErrValidation)
 			}
 			updateParams.EndDate = &endDateParsed
 		}
