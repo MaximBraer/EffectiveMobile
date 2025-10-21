@@ -21,7 +21,7 @@ type ServicesRepository interface {
 }
 
 type SubscriptionRepository interface {
-	CreateSubscription(ctx context.Context, p repository.CreateSubscriptionParams, log *slog.Logger) (int64, error)
+	CreateSubscription(ctx context.Context, p repository.CreateSubscriptionParams) (int64, error)
 	GetSubscription(ctx context.Context, id int64) (repository.Subscription, error)
 	UpdateSubscription(ctx context.Context, p repository.UpdateSubscriptionParams) error
 	DeleteSubscription(ctx context.Context, id int64) error
@@ -78,7 +78,7 @@ func (s *SubscriptionService) CreateSubscription(ctx context.Context, serviceNam
 		PriceRub:  price,
 		StartDate: startDateParsed,
 		EndDate:   endDatePtr,
-	}, log)
+	})
 	if err != nil {
 		log.Error("create subscription failed", slog.String("err", err.Error()))
 		return 0, err

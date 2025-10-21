@@ -63,8 +63,8 @@ func (s *SubscriptionServiceSuite) TestCreateSubscription_Success() {
 			ServiceID: serviceID,
 			PriceRub:  price,
 			StartDate: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
-			EndDate:   nil, // Для теста без endDate
-		}, gomock.Any()).
+			EndDate:   nil,
+		}).
 		Return(subscriptionID, nil)
 
 	result, err := s.subscriptionService.CreateSubscription(s.ctx, serviceName, price, userID, startDate, "")
@@ -93,7 +93,7 @@ func (s *SubscriptionServiceSuite) TestCreateSubscription_WithEndDate() {
 			PriceRub:  price,
 			StartDate: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
 			EndDate:   &[]time.Time{time.Date(2024, 3, 1, 0, 0, 0, 0, time.UTC)}[0],
-		}, gomock.Any()).
+		}).
 		Return(subscriptionID, nil)
 
 	result, err := s.subscriptionService.CreateSubscription(s.ctx, serviceName, price, userID, startDate, endDate)
@@ -126,7 +126,6 @@ func (s *SubscriptionServiceSuite) TestCreateSubscription_InvalidDate() {
 	price := 500
 	startDate := "invalid-date"
 
-	// Не ожидаем вызовов репозитория, так как валидация происходит раньше
 	result, err := s.subscriptionService.CreateSubscription(s.ctx, serviceName, price, userID, startDate, "")
 
 	s.Error(err)
@@ -141,7 +140,6 @@ func (s *SubscriptionServiceSuite) TestCreateSubscription_EndDateBeforeStartDate
 	startDate := "03-2024"
 	endDate := "01-2024"
 
-	// Не ожидаем вызовов репозитория, так как валидация происходит раньше
 	result, err := s.subscriptionService.CreateSubscription(s.ctx, serviceName, price, userID, startDate, endDate)
 
 	s.Error(err)
@@ -191,7 +189,6 @@ func (s *SubscriptionServiceSuite) TestUpdateSubscription_Success() {
 	startDate := "02-2024"
 	endDate := "04-2024"
 
-	// Сначала получаем существующую подписку
 	existingSubscription := repository.Subscription{
 		ID:          subscriptionID,
 		UserID:      uuid.New(),

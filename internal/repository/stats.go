@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/Masterminds/squirrel"
@@ -93,7 +94,11 @@ func (r *StatsRepository) GetTotalCost(ctx context.Context, p GetTotalCostParams
 	if err != nil {
 		return TotalCostStats{}, fmt.Errorf("failed to execute query: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			r.logger.Warn("rows.Close():", slog.String("error", err.Error()))
+		}
+	}()
 
 	var subscriptions []SubscriptionCost
 	for rows.Next() {

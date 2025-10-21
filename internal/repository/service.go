@@ -13,10 +13,10 @@ import (
 )
 
 var (
-	ErrServiceNotFound         = errors.New("service not found")
-	ErrServiceNameExists       = errors.New("service name already exists")
-	ErrServiceInUse            = errors.New("service is referenced by subscriptions")
-	ErrInvalidDateFormat       = errors.New("invalid date format")
+	ErrServiceNotFound   = errors.New("service not found")
+	ErrServiceNameExists = errors.New("service name already exists")
+	ErrServiceInUse      = errors.New("service is referenced by subscriptions")
+	ErrInvalidDateFormat = errors.New("invalid date format")
 )
 
 type Provider interface {
@@ -120,6 +120,24 @@ func (r *ServiceRepository) GetOrCreateServiceID(ctx context.Context, name strin
 }
 
 func (r *ServiceRepository) DeleteService(ctx context.Context, id int) error {
+	checkQuery, checkArgs, err := squirrel.Select("COUNT(*)").
+		From("subscription").
+		Where(squirrel.Eq{"service_id": id}).
+		PlaceholderFormat(squirrel.Dollar).
+		ToSql()
+	if err != nil {
+		return fmt.Errorf("could not build check query: %w", err)
+	}
+
+	var count int
+	if err := r.provider.GetConn().QueryRowContext(ctx, checkQuery, checkArgs...).Scan(&count); err != nil {
+		return err
+	}
+
+	if count > 0 {
+		return ErrServiceInUse
+	}
+
 	query, args, err := squirrel.Delete("service").
 		Where(squirrel.Eq{"id": id}).
 		PlaceholderFormat(squirrel.Dollar).
@@ -140,25 +158,6 @@ func (r *ServiceRepository) DeleteService(ctx context.Context, id int) error {
 
 	if rowsAffected == 0 {
 		return ErrServiceNotFound
-	}
-
-	// Проверяем, не используется ли сервис в подписках
-	checkQuery, checkArgs, err := squirrel.Select("COUNT(*)").
-		From("subscription").
-		Where(squirrel.Eq{"service_id": id}).
-		PlaceholderFormat(squirrel.Dollar).
-		ToSql()
-	if err != nil {
-		return fmt.Errorf("could not build check query: %w", err)
-	}
-
-	var count int
-	if err := r.provider.GetConn().QueryRowContext(ctx, checkQuery, checkArgs...).Scan(&count); err != nil {
-		return err
-	}
-
-	if count > 0 {
-		return ErrServiceInUse
 	}
 
 	return nil
