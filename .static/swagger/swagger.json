@@ -10,7 +10,7 @@
         "version": "1.0"
     },
     "host": "localhost:8080",
-    "basePath": "/api/v1.",
+    "basePath": "/api/v1",
     "paths": {
         "/stats/total": {
             "get": {
