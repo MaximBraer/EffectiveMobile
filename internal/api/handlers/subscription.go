@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -36,6 +37,11 @@ type CreateSubscriptionRequest struct {
 	EndDate     *string   `json:"end_date,omitempty"`
 }
 
+func validateCreateSubscriptionRequest(req CreateSubscriptionRequest) error {
+	validate := validator.New()
+	return validate.Struct(req)
+}
+
 type CreateSubscriptionResponse struct {
 	Status string `json:"status"`
 	ID     int64  `json:"id"`
@@ -45,6 +51,19 @@ type UpdateSubscriptionRequest struct {
 	Price     *int    `json:"price,omitempty" validate:"omitempty,min=0"`
 	StartDate *string `json:"start_date,omitempty"`
 	EndDate   *string `json:"end_date,omitempty"`
+}
+
+func validateUpdateSubscriptionRequest(req UpdateSubscriptionRequest) error {
+	validate := validator.New()
+	if err := validate.Struct(req); err != nil {
+		return err
+	}
+	
+	if req.Price == nil && req.StartDate == nil && req.EndDate == nil {
+		return fmt.Errorf("at least one field must be provided")
+	}
+	
+	return nil
 }
 
 type GetSubscriptionResponse struct {
@@ -82,8 +101,7 @@ func SaveSubscription(subscriptionService SubscriptionService, statsService Stat
 			return
 		}
 
-		validate := validator.New()
-		if err := validate.Struct(req); err != nil {
+		if err := validateCreateSubscriptionRequest(req); err != nil {
 			response.WriteError(w, http.StatusBadRequest, ErrInvalidArguments)
 			return
 		}
@@ -209,14 +227,8 @@ func UpdateSubscription(subscriptionService SubscriptionService, statsService St
 			return
 		}
 
-		validate := validator.New()
-		if err := validate.Struct(req); err != nil {
+		if err := validateUpdateSubscriptionRequest(req); err != nil {
 			response.WriteError(w, http.StatusBadRequest, "invalid arguments")
-			return
-		}
-
-		if req.Price == nil && req.StartDate == nil && req.EndDate == nil {
-			response.WriteError(w, http.StatusBadRequest, "at least one field must be provided")
 			return
 		}
 

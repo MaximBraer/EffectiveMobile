@@ -7,6 +7,7 @@ import (
 	"EffectiveMobile/pkg/api/response"
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"time"
@@ -48,6 +49,51 @@ func getStringParam(r *http.Request, key string) *string {
 	return nil
 }
 
+type validatedStatsParams struct {
+	UserID      *uuid.UUID
+	ServiceName *string
+	StartDate   *time.Time
+	EndDate     *time.Time
+}
+
+func validateStatsParams(req GetTotalStatsRequest, statsService StatsService) (*validatedStatsParams, error) {
+	params := &validatedStatsParams{}
+
+	if req.UserID != nil {
+		id, err := uuid.Parse(*req.UserID)
+		if err != nil {
+			return nil, err
+		}
+		params.UserID = &id
+	}
+
+	if req.ServiceName != nil {
+		params.ServiceName = req.ServiceName
+	}
+
+	if req.StartDate != nil {
+		date, err := statsService.ParseMonth(*req.StartDate)
+		if err != nil {
+			return nil, err
+		}
+		params.StartDate = &date
+	}
+
+	if req.EndDate != nil {
+		date, err := statsService.ParseMonth(*req.EndDate)
+		if err != nil {
+			return nil, err
+		}
+		params.EndDate = &date
+	}
+
+	if params.StartDate != nil && params.EndDate != nil && params.EndDate.Before(*params.StartDate) {
+		return nil, fmt.Errorf("end date must be after start date")
+	}
+
+	return params, nil
+}
+
 type Period struct {
 	Start string `json:"start"`
 	End   string `json:"end"`
@@ -85,39 +131,8 @@ func GetTotalStats(statsService StatsService, log *slog.Logger) http.HandlerFunc
 			EndDate:     getStringParam(r, "end_date"),
 		}
 
-		var userID *uuid.UUID
-		var serviceName *string
-		var startDate, endDate *time.Time
-
-		if req.UserID != nil {
-			if id, err := uuid.Parse(*req.UserID); err == nil {
-				userID = &id
-			}
-		}
-
-		if req.ServiceName != nil {
-			serviceName = req.ServiceName
-		}
-
-		if req.StartDate != nil {
-			if date, err := statsService.ParseMonth(*req.StartDate); err == nil {
-				startDate = &date
-			} else {
-				response.WriteError(w, http.StatusBadRequest, ErrInvalidArguments)
-				return
-			}
-		}
-
-		if req.EndDate != nil {
-			if date, err := statsService.ParseMonth(*req.EndDate); err == nil {
-				endDate = &date
-			} else {
-				response.WriteError(w, http.StatusBadRequest, ErrInvalidArguments)
-				return
-			}
-		}
-
-		if startDate != nil && endDate != nil && endDate.Before(*startDate) {
+		params, err := validateStatsParams(req, statsService)
+		if err != nil {
 			response.WriteError(w, http.StatusBadRequest, ErrInvalidArguments)
 			return
 		}
@@ -125,7 +140,7 @@ func GetTotalStats(statsService StatsService, log *slog.Logger) http.HandlerFunc
 		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 		defer cancel()
 
-		stats, err := statsService.GetTotalCost(ctx, userID, serviceName, startDate, endDate)
+		stats, err := statsService.GetTotalCost(ctx, params.UserID, params.ServiceName, params.StartDate, params.EndDate)
 
 		if err != nil {
 			reqLog.Error("get total cost failed", slog.String("err", err.Error()))
