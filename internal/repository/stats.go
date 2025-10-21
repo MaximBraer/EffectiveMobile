@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log/slog"
 	"time"
@@ -110,19 +111,20 @@ func (r *StatsRepository) GetTotalCost(ctx context.Context, p GetTotalCostParams
 	var subscriptions []SubscriptionCost
 	for rows.Next() {
 		var id int64
-		var startDate, endDate time.Time
+		var startDate time.Time
+		var endDate sql.NullTime
 		var priceRub int
 		var userID uuid.UUID
 		var serviceName string
-		var endDatePtr *time.Time
 
 		err := rows.Scan(&id, &startDate, &endDate, &priceRub, &userID, &serviceName)
 		if err != nil {
 			return TotalCostStats{}, fmt.Errorf("failed to scan row: %w", err)
 		}
 
-		if !endDate.IsZero() {
-			endDatePtr = &endDate
+		var endDatePtr *time.Time
+		if endDate.Valid {
+			endDatePtr = &endDate.Time
 		}
 
 		subscriptions = append(subscriptions, SubscriptionCost{
