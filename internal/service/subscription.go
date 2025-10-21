@@ -49,6 +49,14 @@ func (s *SubscriptionService) CreateSubscription(ctx context.Context, serviceNam
 	const op = "service.subscription.CreateSubscription"
 	log := s.log.With(slog.String("op", op))
 
+	if serviceName == "" {
+		return 0, fmt.Errorf("%w: service name is required", ErrValidation)
+	}
+
+	if price < 0 {
+		return 0, fmt.Errorf("%w: price must be non-negative", ErrValidation)
+	}
+
 	startDateParsed, err := s.ParseMonth(startDate)
 	if err != nil {
 		return 0, fmt.Errorf("%w: %s", ErrValidation, err.Error())
@@ -104,6 +112,18 @@ func (s *SubscriptionService) UpdateSubscription(ctx context.Context, id int64, 
 	const op = "service.subscription.UpdateSubscription"
 	log := s.log.With(slog.String("op", op))
 
+	if id <= 0 {
+		return fmt.Errorf("%w: invalid subscription id", ErrValidation)
+	}
+
+	if serviceName != nil && *serviceName == "" {
+		return fmt.Errorf("%w: service name cannot be empty", ErrValidation)
+	}
+
+	if price != nil && *price < 0 {
+		return fmt.Errorf("%w: price must be non-negative", ErrValidation)
+	}
+
 	updateParams := repository.UpdateSubscriptionParams{
 		ID:       id,
 		PriceRub: price,
@@ -134,8 +154,18 @@ func (s *SubscriptionService) UpdateSubscription(ctx context.Context, id int64, 
 			if err != nil {
 				return fmt.Errorf("%w: %s", ErrValidation, err.Error())
 			}
-			if updateParams.StartDate != nil && endDateParsed.Before(*updateParams.StartDate) {
-				return fmt.Errorf("%w: end date must be after start date", ErrValidation)
+			if updateParams.StartDate != nil {
+				if endDateParsed.Before(*updateParams.StartDate) {
+					return fmt.Errorf("%w: end date must be after start date", ErrValidation)
+				}
+			} else {
+				// Validate against current start_date if not provided in request
+				current, getErr := s.subscriptionRepo.GetSubscription(ctx, id)
+				if getErr == nil {
+					if endDateParsed.Before(current.StartDate) {
+						return fmt.Errorf("%w: end date must be after start date", ErrValidation)
+					}
+				}
 			}
 			updateParams.EndDate = &endDateParsed
 		}

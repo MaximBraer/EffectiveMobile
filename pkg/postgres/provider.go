@@ -37,7 +37,7 @@ func New(user, pass string, sqlDataBase SQLDataBase, logger Logger) *Provider {
 		cs:        info,
 		idlConns:  sqlDataBase.MaxIdleCons,
 		openConns: sqlDataBase.MaxOpenCons,
-		lifetime:  time.Duration(sqlDataBase.ConnMaxLifetime) * time.Minute,
+        lifetime:  time.Duration(sqlDataBase.ConnMaxLifetime) * time.Second,
 		logger:    logger,
 	}
 }
@@ -54,7 +54,7 @@ func (p *Provider) Open() error {
 
 	p.db.SetMaxOpenConns(p.openConns)
 
-	p.db.SetConnMaxLifetime(p.lifetime)
+    p.db.SetConnMaxLifetime(p.lifetime)
 
 	err = p.db.Ping()
 	if err != nil {

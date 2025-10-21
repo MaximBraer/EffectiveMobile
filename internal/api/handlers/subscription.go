@@ -13,6 +13,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+    "strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -49,7 +50,13 @@ type CreateSubscriptionRequest struct {
 
 func validateCreateSubscriptionRequest(req CreateSubscriptionRequest) error {
 	validate := validator.New()
-	return validate.Struct(req)
+
+    req.ServiceName = strings.TrimSpace(req.ServiceName)
+    if req.ServiceName == "" { 
+        return fmt.Errorf("service_name is required")
+    }
+	
+    return validate.Struct(req)
 }
 
 type CreateSubscriptionResponse struct {
@@ -58,7 +65,7 @@ type CreateSubscriptionResponse struct {
 }
 
 type UpdateSubscriptionRequest struct {
-	ServiceName *string `json:"service_name,omitempty"`
+    ServiceName *string `json:"service_name,omitempty" validate:"omitempty,min=1"`
 	Price       *int    `json:"price,omitempty" validate:"omitempty,min=0"`
 	StartDate   *string `json:"start_date,omitempty"`
 	EndDate     *string `json:"end_date,omitempty"`
@@ -66,6 +73,14 @@ type UpdateSubscriptionRequest struct {
 
 func validateUpdateSubscriptionRequest(req UpdateSubscriptionRequest) error {
 	validate := validator.New()
+    if req.ServiceName != nil {
+        trimmed := strings.TrimSpace(*req.ServiceName)
+        if trimmed == "" {
+            req.ServiceName = nil
+        } else {
+            req.ServiceName = &trimmed
+        }
+    }
 	if err := validate.Struct(req); err != nil {
 		return err
 	}
@@ -248,7 +263,7 @@ func UpdateSubscription(subscriptionService SubscriptionService, log *slog.Logge
 
 		idStr := chi.URLParam(r, "id")
 		id, err := strconv.ParseInt(idStr, 10, 64)
-		if err != nil {
+        if err != nil || id <= 0 {
 			response.WriteError(w, http.StatusBadRequest, ErrInvalidSubscriptionID)
 			return
 		}
@@ -278,14 +293,10 @@ func UpdateSubscription(subscriptionService SubscriptionService, log *slog.Logge
 				response.WriteError(w, http.StatusNotFound, ErrSubscriptionNotFound)
 				return
 			}
-			if errors.Is(err, repository.ErrSubscriptionAlreadyExists) {
-				response.WriteError(w, http.StatusConflict, ErrSubscriptionExists)
-				return
-			}
-			if errors.Is(err, repository.ErrInvalidData) {
-				response.WriteError(w, http.StatusBadRequest, ErrInvalidArguments)
-				return
-			}
+		if errors.Is(err, repository.ErrSubscriptionAlreadyExists) {
+			response.WriteError(w, http.StatusConflict, ErrSubscriptionExists)
+			return
+		}
 			reqLog.Error("update subscription failed", slog.String("err", err.Error()))
 			response.WriteError(w, http.StatusInternalServerError, ErrInternalServer)
 			return
