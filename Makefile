@@ -1,4 +1,4 @@
-.PHONY: test test-unit test-integration test-all docker-up docker-down migrate-up migrate-down reset-db clean
+.PHONY: test-unit test-integration test-all docker-up docker-down migrate-up migrate-down reset-db gen_swagger
 
 test-unit:
 	@echo "Running unit tests..."
@@ -9,10 +9,6 @@ test-integration:
 	INTEGRATION_TESTS=true go test -v ./tests/integration/...
 
 test-all: test-unit test-integration
-
-test-short:
-	@echo "Running short tests..."
-	go test -short -v ./...
 
 migrate-up:
 	@echo "Applying database migrations..."
@@ -25,8 +21,6 @@ migrate-down:
 docker-up:
 	@echo "Starting Docker environment..."
 	docker-compose up -d
-	@echo "Waiting for PostgreSQL to be ready..."
-	@sleep 10
 
 docker-down:
 	@echo "Stopping Docker environment..."
@@ -34,6 +28,4 @@ docker-down:
 
 gen_swagger:
 	go run github.com/swaggo/swag/cmd/swag@latest init --requiredByDefault --parseDependency --parseInternal --parseDepth 2 --parseGoList --output=./.static/swagger --outputTypes=json -g ./cmd/subscription/main.go
-
-reset-db: docker-down clean docker-up migrate-up
 
